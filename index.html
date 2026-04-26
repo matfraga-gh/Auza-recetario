@@ -309,7 +309,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="ptitle">Usuarios del sistema</div>
     <div class="psub">Roles: Admin · Compras · Cocina</div>
     <div class="tw"><table class="tbl">
-      <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Local</th><th>Estado</th><th></th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
       <tbody id="usersTbody"></tbody>
     </table></div>
   </div>
@@ -355,7 +355,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         </div>
       </div>
       <table class="ctbl">
-        <thead><tr><th>Tipo</th><th>Componente</th><th>Cantidad</th><th>Unidad</th><th>Grupo</th><th>Costo</th><th></th></tr></thead>
+        <thead><tr><th>Tipo</th><th>Componente</th><th>Cantidad</th><th>Unidad</th><th>Costo</th><th></th></tr></thead>
         <tbody id="compRows"></tbody>
       </table>
     </div>
@@ -472,10 +472,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
       </div>
     </div>
     <div class="frow">
-      <div class="fg"><label>Local asignado</label>
-        <select id="uLocal"><option value="todos">Todos</option><option value="azafran">Azafrán</option><option value="trapiche">Espacio Trapiche</option><option value="nieto">Nieto Senetiner</option><option value="vinobien">Vinobien</option><option value="cobos">Viña Cobos</option></select>
-      </div>
       <div class="fg"><label>Estado</label><select id="uAct"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+      <input type="hidden" id="uLocal" value="todos">
     </div>
     <div class="ma">
       <button class="btn bs" onclick="closeOv('ovU')">Cancelar</button>
@@ -506,6 +504,15 @@ function fcc(fc){return fc<=30?'bg':fc<=40?'bw':'br';}
 function ltag(l){return `<span class="ltag ${l}">${LL[l]||l}</span>`;}
 
 function showView(id){
+  // Control de acceso por rol
+  const esCompras = CU && CU.rol==='compras';
+  const esCocina  = CU && CU.rol==='cocina';
+  if(esCompras && (id==='vElab'||id==='vPlatos'||id==='vMenus')){
+    toast('⛔ Compras no tiene acceso a recetas'); return;
+  }
+  if(esCocina && (id==='vIng'||id==='vImport'||id==='vUsers')){
+    toast('⛔ Cocina no tiene acceso a ingredientes'); return;
+  }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if(id==='vElab')loadElab();else if(id==='vPlatos')loadPlatos();else if(id==='vMenus')loadMenus();else if(id==='vIng')loadIng();else if(id==='vUsers')loadUsers();
@@ -795,7 +802,6 @@ function addCompRow(c={}){
     <td style="min-width:160px"><select class="cr" onchange="updPrev()"><option value="">Seleccionar...</option>${opts}</select></td>
     <td><input type="number" class="cq" value="${c.cantidad||''}" placeholder="0" step="0.001" min="0" oninput="updPrev()" style="width:75px"></td>
     <td><input type="text" class="cu" value="${c.unidad||''}" style="width:55px" placeholder="kg"></td>
-    <td><input type="text" class="cg" value="${c.grupo||''}" style="width:80px" placeholder="grupo"></td>
     <td class="cc price" style="min-width:65px">$0</td>
     <td><button class="bd" onclick="this.closest('tr').remove();updPrev()">✕</button></td>`;
   document.getElementById('compRows').appendChild(tr);updPrev();
@@ -826,7 +832,7 @@ async function saveRec(){
   document.querySelectorAll('#compRows tr').forEach(tr=>{
     const t=tr.dataset.tipo;const ref=parseInt(tr.querySelector('.cr')?.value)||0;const qty=parseFloat(tr.querySelector('.cq')?.value)||0;
     if(!ref||!qty)return;
-    comps.push({tipo_componente:t,ingrediente_id:t==='ingrediente'?ref:null,sub_receta_id:t==='receta'?ref:null,cantidad:qty,unidad:tr.querySelector('.cu')?.value||'',grupo:tr.querySelector('.cg')?.value||''});
+    comps.push({tipo_componente:t,ingrediente_id:t==='ingrediente'?ref:null,sub_receta_id:t==='receta'?ref:null,cantidad:qty,unidad:tr.querySelector('.cu')?.value||''});
   });
   let rid=eRec;
   if(eRec){await api(`recetas?id=eq.${eRec}`,'PATCH',data);await api(`receta_componentes?receta_id=eq.${eRec}`,'DELETE');toast('Guardado ✓');}
@@ -1239,7 +1245,7 @@ window.cancelCSV=cancelCSV;
 // USUARIOS
 async function loadUsers(){
   USERS=await api('usuarios?select=*&order=rol.asc,nombre.asc')||[];
-  document.getElementById('usersTbody').innerHTML=USERS.map(u=>`<tr><td><strong>${u.nombre}</strong></td><td>@${u.usuario}</td><td>${RL[u.rol]||u.rol}</td><td>${LL[u.local||'todos']||u.local||'—'}</td><td><span class="badge ${u.activo?'bg':'bgr'}">${u.activo?'Activo':'Inactivo'}</span></td><td style="display:flex;gap:4px">${u.id!==CU.id?`<button class="bsm" onclick="editUser(${u.id})">✏️</button><button class="bd" onclick="delUser(${u.id})">🗑</button>`:'<span style="color:var(--gray);font-size:11px">tu cuenta</span>'}</td></tr>`).join('');
+  document.getElementById('usersTbody').innerHTML=USERS.map(u=>`<tr><td><strong>${u.nombre}</strong></td><td>@${u.usuario}</td><td>${RL[u.rol]||u.rol}</td><td><span class="badge ${u.activo?'bg':'bgr'}">${u.activo?'Activo':'Inactivo'}</span></td><td style="display:flex;gap:4px">${u.id!==CU.id?`<button class="bsm" onclick="editUser(${u.id})">✏️</button><button class="bd" onclick="delUser(${u.id})">🗑</button>`:'<span style="color:var(--gray);font-size:11px">tu cuenta</span>'}</td></tr>`).join('');
 }
 
 function openUserModal(){
