@@ -480,9 +480,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
           <option value="g">g — gramos</option>
           <option value="kg">kg — kilogramos</option>
           <option value="ml">ml — mililitros</option>
-          <option value="l">l — litros</option>
           <option value="unidad">unidad</option>
-          <option value="docena">docena</option>
         </select>
       </div>
       <div class="fg">
@@ -619,8 +617,8 @@ function ltag(l){return `<span class="ltag ${l}">${LL[l]||l}</span>`;}
 
 // Familias de unidades compatibles y sus factores respecto a la unidad base
 // g ↔ kg: 1 kg = 1000 g  |  ml ↔ l: 1 l = 1000 ml
-const UNIDAD_FAMILIA={g:'masa',kg:'masa',ml:'volumen',l:'volumen',lt:'volumen',unidad:'conteo',docena:'conteo'};
-const A_BASE={g:1,kg:1000,ml:1,l:1000,lt:1000,unidad:1,docena:12};// factor para convertir a la unidad más pequeña
+const UNIDAD_FAMILIA={g:'masa',kg:'masa',ml:'volumen',lt:'volumen',unidad:'conteo'};
+const A_BASE={g:1,kg:1000,ml:1,lt:1000,unidad:1};// factor para convertir a la unidad más pequeña
 
 // Devuelve las unidades compatibles con una unidad dada (misma familia)
 function unidadesCompatibles(und){
@@ -1095,7 +1093,7 @@ function onCompSelect(sel){
 }
 window.onCompSelect=onCompSelect;
 
-const TODAS_UNIDADES=['g','kg','ml','l','unidad','docena'];
+const TODAS_UNIDADES=['g','kg','ml','lt','unidad'];
 
 // Pobla el select para ingredientes — usa unidad base del ingrediente con ★
 function llenarUnidadComp(tr,ingId,undPrevia=''){
@@ -1400,7 +1398,7 @@ async function saveIng(validar=false){
     subfamilia:document.getElementById('iSub').value||null,
     codigo_hiopos:document.getElementById('iCod').value.trim()||null,
     costo:costoEnv,
-    unidad:(()=>{const u=document.getElementById('iUnd').value;return u==='lt'?'l':u;})(),
+    unidad:document.getElementById('iUnd').value,
     cantidad_por_presentacion:cantBase,
     validado:validar,
     validado_por:validar?CU.id:null,
