@@ -480,6 +480,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
           <option value="g">g — gramos</option>
           <option value="kg">kg — kilogramos</option>
           <option value="ml">ml — mililitros</option>
+          <option value="lt">lt — litros</option>
           <option value="unidad">unidad</option>
         </select>
       </div>
@@ -617,8 +618,8 @@ function ltag(l){return `<span class="ltag ${l}">${LL[l]||l}</span>`;}
 
 // Familias de unidades compatibles y sus factores respecto a la unidad base
 // g ↔ kg: 1 kg = 1000 g  |  ml ↔ l: 1 l = 1000 ml
-const UNIDAD_FAMILIA={g:'masa',kg:'masa',ml:'volumen',lt:'volumen',unidad:'conteo'};
-const A_BASE={g:1,kg:1000,ml:1,lt:1000,unidad:1};// factor para convertir a la unidad más pequeña
+const UNIDAD_FAMILIA={g:'masa',kg:'masa',ml:'volumen',l:'volumen',lt:'volumen',unidad:'conteo'};
+const A_BASE={g:1,kg:1000,ml:1,l:1000,lt:1000,unidad:1};// factor para convertir a la unidad más pequeña
 
 // Devuelve las unidades compatibles con una unidad dada (misma familia)
 function unidadesCompatibles(und){
@@ -1101,8 +1102,8 @@ function llenarUnidadComp(tr,ingId,undPrevia=''){
   const sel=tr.querySelector('.cu');
   if(!sel||sel.tagName!=='SELECT') return;
   if(!i){sel.innerHTML='<option value="">—</option>';return;}
-  const base=i.unidad||'';
-  const elegida=undPrevia||base||'g';
+  const base=(i.unidad==='l'?'lt':i.unidad)||'';
+  const elegida=(undPrevia==='l'?'lt':undPrevia)||base||'g';
   // Solo mostrar unidades compatibles con la unidad base del ingrediente
   const compatibles=unidadesCompatibles(base);
   sel.innerHTML=compatibles.map(u=>{
@@ -1398,7 +1399,7 @@ async function saveIng(validar=false){
     subfamilia:document.getElementById('iSub').value||null,
     codigo_hiopos:document.getElementById('iCod').value.trim()||null,
     costo:costoEnv,
-    unidad:document.getElementById('iUnd').value,
+    unidad:(()=>{const u=document.getElementById('iUnd').value;return u==='l'?'lt':u;})(),
     cantidad_por_presentacion:cantBase,
     validado:validar,
     validado_por:validar?CU.id:null,
