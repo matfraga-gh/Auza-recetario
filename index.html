@@ -1105,7 +1105,9 @@ function llenarUnidadComp(tr,ingId,undPrevia=''){
   if(!i){sel.innerHTML='<option value="">—</option>';return;}
   const base=i.unidad||'';
   const elegida=undPrevia||base||'g';
-  sel.innerHTML=TODAS_UNIDADES.map(u=>{
+  // Solo mostrar unidades compatibles con la unidad base del ingrediente
+  const compatibles=unidadesCompatibles(base);
+  sel.innerHTML=compatibles.map(u=>{
     return `<option value="${u}" ${elegida===u?'selected':''}>${u===base?u+' ★':u}</option>`;
   }).join('');
 }
@@ -1117,7 +1119,9 @@ function llenarUnidadSubRec(tr,recId,undPrevia=''){
   if(!sel||sel.tagName!=='SELECT') return;
   const base=r?r.unidad_rendimiento||'porcion':'porcion';
   const elegida=undPrevia||base;
-  sel.innerHTML=TODAS_UNIDADES.map(u=>{
+  // Solo mostrar unidades compatibles con la unidad de rendimiento de la sub-elaboración
+  const compatibles=unidadesCompatibles(base).length>0?unidadesCompatibles(base):[base];
+  sel.innerHTML=compatibles.map(u=>{
     return `<option value="${u}" ${elegida===u?'selected':''}>${u===base?u+' ★':u}</option>`;
   }).join('');
 }
