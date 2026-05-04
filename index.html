@@ -802,7 +802,14 @@ function addCompRow(c={}){
   tr.innerHTML=`<td><span class="badge ${tipo==='ingrediente'?'bol':'bbl'}" style="font-size:10px;white-space:nowrap">${tipo==='ingrediente'?'🧂':'🧪'}</span></td>
     <td style="min-width:160px"><select class="cr" onchange="updPrev()"><option value="">Seleccionar...</option>${opts}</select></td>
     <td><input type="number" class="cq" value="${c.cantidad||''}" placeholder="0" step="0.001" min="0" oninput="updPrev()" style="width:75px"></td>
-    <td><input type="text" class="cu" value="${c.unidad||''}" style="width:55px" placeholder="kg"></td>
+    <td><select class="cu" style="width:80px;padding:5px 4px;font-size:12px;border:1px solid var(--sand);border-radius:6px;background:var(--cream)">
+      <option value="kg" ${(c.unidad||'kg')==='kg'?'selected':''}>kg</option>
+      <option value="lt" ${(c.unidad||'')==='lt'?'selected':''}>lt</option>
+      <option value="g" ${(c.unidad||'')==='g'?'selected':''}>g</option>
+      <option value="ml" ${(c.unidad||'')==='ml'?'selected':''}>ml</option>
+      <option value="unidad" ${(c.unidad||'')==='unidad'?'selected':''}>unidad</option>
+      <option value="docena" ${(c.unidad||'')==='docena'?'selected':''}>docena</option>
+    </select></td>
     <td class="cc price" style="min-width:65px">$0</td>
     <td><button class="bd" onclick="this.closest('tr').remove();updPrev()">✕</button></td>`;
   document.getElementById('compRows').appendChild(tr);updPrev();
