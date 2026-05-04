@@ -566,12 +566,12 @@ function costo(r){
 }
 
 async function loadAll(){
-  // Ingredientes: solo validados, sin límite (para usar en recetas)
   const[a,b]=await Promise.all([
     api('ingredientes?select=*&activo=eq.true&validado=eq.true&order=nombre.asc&limit=5000'),
-    api('recetas?select=*,receta_componentes(*)&activo=eq.true&order=nombre.asc&limit=2000')
+    api('recetas?select=*,receta_componentes(*)&activo=eq.true&tipo=neq.menu&order=nombre.asc&limit=2000')
   ]);
   INGS=a||[];RECS=b||[];
+  console.log(`loadAll: ${INGS.length} ingredientes, ${RECS.length} recetas`);
 }
 
 async function loadElab(){await loadAll();renderElab();}
@@ -728,9 +728,9 @@ function renderMenus(){
   }).join('');
 }
 
-function openElabModal(){eRec=null;document.getElementById('rTitle').textContent='Nueva Elaboración';document.getElementById('rTipo').value='elaboracion';resetRForm();openOv('ovR');}
+function openElabModal(){eRec=null;document.getElementById('rTitle').textContent='Nueva Elaboración';document.getElementById('rTipo').value='elaboracion';document.getElementById('rCatRow').style.display='none';resetRForm();openOv('ovR');}
 window.openElabModal=openElabModal;
-function openPlatoModal(){eRec=null;document.getElementById('rTitle').textContent='Nuevo Plato / Paso';document.getElementById('rTipo').value='plato';resetRForm();openOv('ovR');}
+function openPlatoModal(){eRec=null;document.getElementById('rTitle').textContent='Nuevo Plato / Paso';document.getElementById('rTipo').value='plato';document.getElementById('rCatRow').style.display='grid';resetRForm();openOv('ovR');}
 window.openPlatoModal=openPlatoModal;
 
 function resetRForm(){
@@ -774,6 +774,7 @@ function editR(id){
   eRec=id;
   document.getElementById('rTitle').textContent=r.tipo==='elaboracion'?'Editar Elaboración':'Editar Plato';
   document.getElementById('rTipo').value=r.tipo;
+  document.getElementById('rCatRow').style.display=r.tipo==='elaboracion'?'none':'grid';
   document.getElementById('rNombre').value=r.nombre||'';document.getElementById('rLocal').value=r.local||'todos';
   document.getElementById('rCat').value=r.categoria||'';document.getElementById('rRend').value=r.rendimiento||1;
   document.getElementById('rTiempo').value=r.tiempo_prep||'';document.getElementById('rUnd').value=r.unidad_rendimiento||'porcion';
