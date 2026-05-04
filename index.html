@@ -568,7 +568,7 @@ function costo(r){
 async function loadAll(){
   const[a,b]=await Promise.all([
     api('ingredientes?select=*&activo=eq.true&validado=eq.true&order=nombre.asc&limit=5000'),
-    api('recetas?select=*,receta_componentes(*)&activo=eq.true&tipo=neq.menu&order=nombre.asc&limit=2000')
+    api('recetas?select=*,receta_componentes(*)&activo=neq.false&tipo=neq.menu&order=nombre.asc&limit=2000')
   ]);
   INGS=a||[];RECS=b||[];
   console.log(`loadAll: ${INGS.length} ingredientes, ${RECS.length} recetas`);
