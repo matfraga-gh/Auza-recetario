@@ -125,6 +125,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .cz:hover{border-color:var(--olive);background:#F0F4EB}
 .cz .icon{font-size:40px;margin-bottom:8px}
 .is{background:#E8F5E9;border-radius:8px;padding:12px 16px;margin-top:12px;font-size:13px;color:var(--green)}
+.admin-tab{background:none;border:none;border-bottom:3px solid transparent;padding:10px 18px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--gray);cursor:pointer;margin-bottom:-2px;transition:all .15s}
+.admin-tab.active{color:var(--olive);border-bottom-color:var(--olive)}
+.admin-tab:hover{color:var(--dark)}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--dark);color:var(--cream);padding:12px 20px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
 .empty{text-align:center;padding:40px;color:var(--gray)}
@@ -160,15 +163,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
 <div id="vElab" class="view">
   <div class="app-hdr">
-    <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Elaboraciones</div></div>
+    <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Sub-elaboraciones</div></div>
     <div class="app-btns">
-      <button class="abtn ao" onclick="openElabModal()">+ Nueva elaboración</button>
+      <button class="abtn ao" onclick="openElabModal()">+ Nueva sub-elaboración</button>
       <button class="abtn ab" onclick="showView('vDash')">← Dashboard</button>
     </div>
   </div>
   <div class="content">
-    <div class="ptitle">Elaboraciones base</div>
-    <div class="psub">Recetas internas que se usan como componente de platos. Ej: pasta de berenjena ahumada, mermelada de tomate, pan de molde.</div>
+    <div class="ptitle">Sub-elaboraciones</div>
+    <div class="psub">Preparaciones internas que no se sirven solas. Se usan como componente de platos. Ej: pasta de tomate, aceite aromatizado, masa de pan, salsa base.</div>
     <div class="toolbar">
       <input type="text" id="elabSearch" placeholder="Buscar..." oninput="renderElab()">
       <select id="elabLocal" onchange="renderElab()">
@@ -192,7 +195,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   </div>
   <div class="content">
     <div class="ptitle">Platos &amp; Pasos de menú</div>
-    <div class="psub">Cada plato tiene su costeo individual. Un mismo plato puede aparecer en menús de distintos locales.</div>
+    <div class="psub">Armá cada plato combinando sub-elaboraciones e ingredientes directos. El sistema calcula el costo automáticamente.</div>
     <div class="toolbar">
       <input type="text" id="platoSearch" placeholder="Buscar..." oninput="renderPlatos()">
       <select id="platoCat" onchange="renderPlatos()">
@@ -257,7 +260,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         <option value="">Todos</option><option value="true">✓ Validados</option><option value="false">⏳ Pendientes</option>
       </select>
       <span id="ingCount" style="font-size:12px;color:var(--gray)"></span>
+      <button class="btn" style="background:#E8F0E0;color:var(--olive);padding:7px 12px;font-size:12px" onclick="diagIngredientes()">🔍 Diagnóstico</button>
     </div>
+    <div id="diagBox" style="display:none;background:var(--dark);color:#a8e6a3;border-radius:10px;padding:16px;margin-bottom:16px;font-family:monospace;font-size:12px;line-height:1.8;white-space:pre-wrap"></div>
     <div class="tw"><table class="tbl">
       <thead><tr>
         <th>Ingrediente</th>
@@ -312,19 +317,39 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
 <div id="vUsers" class="view">
   <div class="app-hdr">
-    <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Usuarios</div></div>
-    <div class="app-btns">
-      <button class="abtn ao" onclick="openUserModal()">+ Nuevo usuario</button>
-      <button class="abtn ab" onclick="showView('vDash')">← Dashboard</button>
-    </div>
+    <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Administración</div></div>
+    <div class="app-btns"><button class="abtn ab" onclick="showView('vDash')">← Dashboard</button></div>
   </div>
   <div class="content">
-    <div class="ptitle">Usuarios del sistema</div>
-    <div class="psub">Roles: Admin · Compras · Cocina</div>
-    <div class="tw"><table class="tbl">
-      <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
-      <tbody id="usersTbody"></tbody>
-    </table></div>
+    <div class="ptitle">Panel de administración</div>
+    <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid var(--sand-l);padding-bottom:0">
+      <button class="admin-tab active" id="tabUsuarios" onclick="switchAdminTab('usuarios')">👥 Usuarios</button>
+      <button class="admin-tab" id="tabLocales" onclick="switchAdminTab('locales')">📍 Locales</button>
+    </div>
+
+    <!-- Tab Usuarios -->
+    <div id="panelUsuarios">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="psub" style="margin:0">Roles: Admin · Compras · Cocina</div>
+        <button class="btn bp" onclick="openUserModal()">+ Nuevo usuario</button>
+      </div>
+      <div class="tw"><table class="tbl">
+        <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="usersTbody"></tbody>
+      </table></div>
+    </div>
+
+    <!-- Tab Locales -->
+    <div id="panelLocales" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="psub" style="margin:0">Locales habilitados en el sistema</div>
+        <button class="btn bp" onclick="openLocalModal()">+ Nuevo local</button>
+      </div>
+      <div class="tw"><table class="tbl">
+        <thead><tr><th>Nombre</th><th>Slug</th><th>Color</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="localesTbody"></tbody>
+      </table></div>
+    </div>
   </div>
 </div>
 
@@ -348,7 +373,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         <select id="rCat"><option value="">Sin categoría</option>
           <option value="snack">Snack / Petit four</option><option value="entrada">Entrada</option>
           <option value="principal">Principal</option><option value="postre">Postre</option>
-          <option value="tapeo">Tapeo</option><option value="pan">Pan / Masas</option><option value="salsa">Salsa / Elaboración base</option>
+          <option value="tapeo">Tapeo</option><option value="pan">Pan / Masas</option><option value="salsa">Sub-elaboración</option>
         </select>
       </div>
       <div class="fg"><label>Tiempo de preparación</label><input type="text" id="rTiempo" placeholder="Ej: 45 min"></div>
@@ -362,7 +387,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="fg full" style="margin-bottom:4px"><label>Procedimiento / Técnica</label><textarea id="rProc" placeholder="Descripción del proceso..."></textarea></div>
     <div class="cs">
       <div class="csl">Componentes
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <span id="compHint" style="font-size:11px;color:var(--gray);display:none">Tip: empezá agregando las sub-elaboraciones</span>
           <button class="btn bs" style="padding:5px 12px;font-size:12px" onclick="addComp('ingrediente')">+ Ingrediente</button>
           <button class="btn bs" style="padding:5px 12px;font-size:12px" onclick="addComp('receta')">+ Sub-elaboración</button>
         </div>
@@ -398,7 +424,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
       </div>
     </div>
     <div class="frow">
-      <div class="fg"><label>Precio de venta ($)</label><input type="number" id="mPrecio" placeholder="0" oninput="updMenu()"></div>
+      <div class="fg"><label>Px Venta Neto ($)</label><input type="number" id="mPrecio" placeholder="0" oninput="updMenu()"></div>
       <div class="fg"><label>Descripción breve</label><input type="text" id="mDesc" placeholder="Ej: 9 pasos con maridaje"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px">
@@ -451,10 +477,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
       <div class="fg">
         <label>Unidad base de medida</label>
         <select id="iUnd" onchange="actualizarInfoUnidad()">
-          <option value="kg">kg (kilogramos)</option>
-          <option value="lt">lt (litros)</option>
-          <option value="g">g (gramos)</option>
-          <option value="ml">ml (mililitros)</option>
+          <option value="g">g — gramos</option>
+          <option value="kg">kg — kilogramos</option>
+          <option value="ml">ml — mililitros</option>
+          <option value="l">l — litros</option>
           <option value="unidad">unidad</option>
           <option value="docena">docena</option>
         </select>
@@ -503,6 +529,31 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   </div>
 </div>
 
+<!-- Modal Local -->
+<div class="overlay" id="ovL">
+  <div class="modal" style="max-width:420px">
+    <button class="mc" onclick="closeOv('ovL')">✕</button>
+    <h2 id="lTitle">Nuevo Local</h2>
+    <div class="frow">
+      <div class="fg full"><label>Nombre del local</label><input type="text" id="lNom" placeholder="Ej: Azafrán"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Slug (identificador único)</label><input type="text" id="lSlug" placeholder="ej: azafran"></div>
+      <div class="fg"><label>Color de etiqueta</label><input type="color" id="lColor" value="#8B1A1A" style="height:40px;padding:4px"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Estado</label><select id="lAct"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+    </div>
+    <div style="background:var(--cream);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--gray);margin-top:4px">
+      El slug debe ser en minúsculas sin espacios ni acentos. Se usa internamente para identificar el local.
+    </div>
+    <div class="ma">
+      <button class="btn bs" onclick="closeOv('ovL')">Cancelar</button>
+      <button class="btn bp" onclick="saveLocal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Usuario -->
 <div class="overlay" id="ovU">
   <div class="modal" style="max-width:460px">
@@ -539,25 +590,78 @@ const LL={azafran:'Azafrán',trapiche:'Espacio Trapiche',nieto:'Nieto Senetiner'
 const RL={admin:'⚙️ Admin',compras:'🛒 Compras',cocina:'🍳 Cocina'};
 
 let CU=null,INGS=[],RECS=[],MENUS=[],USERS=[],MPASOS=[],eIng=null,eRec=null,eMenu=null,eUser=null,csvD=[],csvH=[];
+let ING_MAP={};
+let LAST_LOAD=0;
+let LOCALES=[];
+let USERS_MAP={}; // id->nombre para auditoría
 
 async function api(p,m='GET',b=null){
-  const o={method:m,headers:{'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK,'Prefer':m==='POST'?'return=representation':''}};
+  const prefer=m==='POST'?'return=representation':'count=none';
+  const o={method:m,headers:{
+    'Content-Type':'application/json',
+    'apikey':SK,
+    'Authorization':'Bearer '+SK,
+    'Prefer':prefer
+  }};
   if(b) o.body=JSON.stringify(b);
-  try{const r=await fetch(SU+'/rest/v1/'+p,o);if(r.status===204)return true;const d=await r.json();if(!r.ok){console.error(d);return null;}return d;}catch(e){console.error(e);return null;}
+  try{
+    const r=await fetch(SU+'/rest/v1/'+p,o);
+    if(r.status===204)return true;
+    const d=await r.json();
+    if(!r.ok){console.error('[API Error]',p,d);return null;}
+    return d;
+  }catch(e){console.error('[API Exception]',p,e);return null;}
 }
 async function sha256(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
 function fmt(n){return '$'+Math.round(n||0).toLocaleString('es-AR');}
 function fcc(fc){return fc<=30?'bg':fc<=40?'bw':'br';}
 function ltag(l){return `<span class="ltag ${l}">${LL[l]||l}</span>`;}
 
+// Familias de unidades compatibles y sus factores respecto a la unidad base
+// g ↔ kg: 1 kg = 1000 g  |  ml ↔ l: 1 l = 1000 ml
+const UNIDAD_FAMILIA={g:'masa',kg:'masa',ml:'volumen',l:'volumen',lt:'volumen',unidad:'conteo',docena:'conteo'};
+const A_BASE={g:1,kg:1000,ml:1,l:1000,lt:1000,unidad:1,docena:12};// factor para convertir a la unidad más pequeña
+
+// Devuelve las unidades compatibles con una unidad dada (misma familia)
+function unidadesCompatibles(und){
+  const fam=UNIDAD_FAMILIA[und];
+  if(!fam) return [und];
+  return Object.keys(UNIDAD_FAMILIA).filter(u=>UNIDAD_FAMILIA[u]===fam);
+}
+
+// Convierte una cantidad de unidad `de` a unidad `a`.
+// Ej: convertir(0.5, 'kg', 'g') → 500
+// Devuelve null si las unidades no son compatibles.
+function convertir(cantidad,de,a){
+  if(de===a) return cantidad;
+  const fDe=UNIDAD_FAMILIA[de], fA=UNIDAD_FAMILIA[a];
+  if(!fDe||!fA||fDe!==fA) return null;
+  return cantidad*(A_BASE[de]/A_BASE[a]);
+}
+
 // Costo por unidad base dado un ingrediente.
-// Si tiene cantidad_por_presentacion > 0, divide el costo del envase.
+// Si tiene cantidad_por_presentacion > 0, divide el costo del envase → costo por 1 unidad base (ej: 1 g).
 // Si no, usa costo directamente (retrocompatibilidad).
 function costoUnitario(ing){
   if(!ing) return 0;
   const cant=parseFloat(ing.cantidad_por_presentacion)||0;
   if(cant>0) return (ing.costo||0)/cant;
   return ing.costo||0;
+}
+
+// Calcula el costo de usar `cantidad` en unidad `undReceta` de un ingrediente cuya unidad base es `ing.unidad`.
+// Convierte automáticamente si son unidades compatibles (ej: receta en kg, ingrediente en g).
+function costoConversion(ing,cantidad,undReceta){
+  if(!ing) return 0;
+  const undBase=ing.unidad||'';
+  const cu=costoUnitario(ing); // costo por 1 unidad base
+  if(!undReceta||undReceta===undBase) return cu*cantidad;
+  const cantConvertida=convertir(cantidad,undReceta,undBase);
+  if(cantConvertida===null){
+    // Unidades incompatibles: usa el valor tal cual (comportamiento anterior)
+    return cu*cantidad;
+  }
+  return cu*cantConvertida;
 }
 
 function showView(id){
@@ -571,7 +675,7 @@ function showView(id){
   }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if(id==='vElab')loadElab();else if(id==='vPlatos')loadPlatos();else if(id==='vMenus')loadMenus();else if(id==='vIng')loadIng();else if(id==='vUsers')loadUsers();
+  if(id==='vElab')loadElab();else if(id==='vPlatos')loadPlatos();else if(id==='vMenus')loadMenus();else if(id==='vIng')loadIng();else if(id==='vUsers'){loadUsers();switchAdminTab('usuarios');}
 }
 window.showView=showView;
 function openOv(id){document.getElementById(id).classList.add('open');}
@@ -579,6 +683,28 @@ function closeOv(id){document.getElementById(id).classList.remove('open');}
 window.closeOv=closeOv;
 document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 function toast(m,d=3000){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),d);}
+
+async function loadLocales(){
+  const data=await api('locales?select=*&activo=eq.true&order=nombre.asc');
+  LOCALES=data||[];
+  // Reconstruir LL (mapa slug→nombre) desde la BD
+  LOCALES.forEach(l=>{LL[l.slug]=l.nombre;});
+  LL['todos']='Transversal';
+  // Actualizar todos los selects de local en el DOM
+  poblarSelectsLocales();
+}
+
+function poblarSelectsLocales(){
+  const optsConTodos=`<option value="">Todos los locales</option>`+LOCALES.map(l=>`<option value="${l.slug}">${l.nombre}</option>`).join('')+`<option value="todos">Transversal (todos)</option>`;
+  const optsSinTodos=LOCALES.map(l=>`<option value="${l.slug}">${l.nombre}</option>`).join('');
+  const optsReceta=`<option value="todos">Transversal (todos)</option>`+LOCALES.map(l=>`<option value="${l.slug}">${l.nombre}</option>`).join('');
+  const mapa={
+    'elabLocal':optsConTodos,'platoLocal':optsConTodos,'menuLocal':optsConTodos,
+    'rLocal':optsReceta,'mLocal':optsSinTodos,
+  };
+  Object.entries(mapa).forEach(([id,opts])=>{const el=document.getElementById(id);if(el)el.innerHTML=opts;});
+  // También los filtros de ingredientes no tienen select de local, ok
+}
 
 async function doLogin(){
   const u=document.getElementById('loginUser').value.trim().toLowerCase();
@@ -594,12 +720,16 @@ window.doLogin=doLogin;
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 function doLogout(){CU=null;sessionStorage.removeItem('az_u');showView('vLogin');}
 window.doLogout=doLogout;
-function afterLogin(){document.getElementById('dashUser').textContent=`${CU.nombre} · ${RL[CU.rol]||CU.rol}`;buildDash();showView('vDash');}
+function afterLogin(){
+  document.getElementById('dashUser').textContent=`${CU.nombre} · ${RL[CU.rol]||CU.rol}`;
+  // Cargar locales primero (sincrónicamente para los selects), luego precargar el resto
+  loadLocales().then(()=>{buildDash();showView('vDash');loadAll().catch(()=>{});});
+}
 function checkSession(){const s=sessionStorage.getItem('az_u');if(s){CU=JSON.parse(s);afterLogin();}else showView('vLogin');}
 
 function buildDash(){
   const cards=[
-    {i:'🧪',t:'Elaboraciones',d:'Recetas base e internas',a:"showView('vElab')"},
+    {i:'🧪',t:'Sub-elaboraciones',d:'Preparaciones internas y bases',a:"showView('vElab')"},
     {i:'🍽',t:'Platos & Pasos',d:'Platos costeados',a:"showView('vPlatos')"},
     {i:'📋',t:'Menús',d:'Armado y costeo de menús',a:"showView('vMenus')"},
   ];
@@ -607,32 +737,67 @@ function buildDash(){
     cards.push({i:'🧂',t:'Ingredientes',d:'Precios y proveedores',badge:'Compras',bc:'boli',a:"showView('vIng')"});
     cards.push({i:'📂',t:'Importar CSV',d:'Actualizar desde HioPOS',badge:'HioPOS',bc:'brus',a:"showView('vImport')"});
   }
-  if(CU.rol==='admin') cards.push({i:'👥',t:'Usuarios',d:'Accesos y roles',badge:'Admin',bc:'bgry',a:"showView('vUsers')",full:true});
+  if(CU.rol==='admin') cards.push({i:'⚙️',t:'Administración',d:'Usuarios y locales',badge:'Admin',bc:'bgry',a:"showView('vUsers')",full:true});
   document.getElementById('dashGrid').innerHTML=cards.map(c=>`<div class="dash-card ${c.full?'full':''}" onclick="${c.a}"><div class="dash-icon">${c.i}</div><div class="dash-title">${c.t}</div><div class="dash-desc">${c.d}</div>${c.badge?`<span class="dash-badge ${c.bc}">${c.badge}</span>`:''}</div>`).join('');
 }
 
-// Costo de una receta usando costoUnitario() para cada ingrediente
+// Costo de una receta — maneja g↔kg y ml↔l automáticamente
 function costo(r){
   if(!r)return 0;
   let t=0;
   (r.receta_componentes||[]).forEach(c=>{
     if(c.tipo_componente==='ingrediente'){
-      const i=INGS.find(x=>x.id===c.ingrediente_id);
-      t+=costoUnitario(i)*c.cantidad;
+      const i=ING_MAP[c.ingrediente_id]||INGS.find(x=>x.id===c.ingrediente_id);
+      t+=costoConversion(i,c.cantidad,c.unidad);
     } else {
       const s=RECS.find(x=>x.id===c.sub_receta_id);
-      t+=costo(s)*c.cantidad;
+      // costo(s) = costo por 1 unidad_rendimiento (ej: por 1 kg)
+      // c.cantidad puede estar en otra unidad (ej: 100 g) → convertir
+      const undBase=s?s.unidad_rendimiento||'porcion':'porcion';
+      const cantConv=convertir(c.cantidad,c.unidad||undBase,undBase)??c.cantidad;
+      t+=costo(s)*cantConv;
     }
   });
   return t/(r.rendimiento||1);
 }
 
-async function loadAll(){
-  const[a,b]=await Promise.all([
-    api('ingredientes?select=*&activo=eq.true&validado=eq.true&order=nombre.asc&limit=5000'),
-    api('recetas?select=*,receta_componentes!receta_componentes_receta_id_fkey(*)&activo=neq.false&order=nombre.asc&limit=2000')
+// Trae todos los registros paginando de a 1000 hasta agotar el total
+async function fetchAll(endpoint){
+  let all=[],offset=0;
+  while(true){
+    const chunk=await api(`${endpoint}&limit=1000&offset=${offset}`);
+    if(!chunk||!chunk.length) break;
+    all=[...all,...chunk];
+    if(chunk.length<1000) break;
+    offset+=1000;
+  }
+  return all;
+}
+
+async function loadAll(forzar=false){
+  const ahora=Date.now();
+  if(!forzar && LAST_LOAD && (ahora-LAST_LOAD)<120000 && INGS.length && RECS.length) return;
+
+  const[a, recetasBase, comps, usuarios]=await Promise.all([
+    fetchAll('ingredientes?select=*&activo=neq.false&order=id.asc'),
+    fetchAll('recetas?select=id,nombre,tipo,local,categoria,rendimiento,unidad_rendimiento,tiempo_prep,procedimiento,precio_venta,activo,creado_por,actualizado_por,actualizado_en&order=id.asc'),
+    fetchAll('receta_componentes?select=*&order=receta_id.asc'),
+    api('usuarios?select=id,nombre&limit=500')
   ]);
-  INGS=a||[];RECS=b||[];
+  // Construir mapa id→nombre para auditoría
+  USERS_MAP={};
+  (usuarios||[]).forEach(u=>{USERS_MAP[u.id]=u.nombre;});
+  INGS=(a||[]).filter(i=>i.nombre);
+  const compMap={};
+  (comps||[]).forEach(c=>{
+    if(!compMap[c.receta_id]) compMap[c.receta_id]=[];
+    compMap[c.receta_id].push(c);
+  });
+  RECS=(recetasBase||[]).filter(r=>r.activo!==false&&r.nombre).map(r=>({...r,receta_componentes:compMap[r.id]||[]}));
+  INGS.forEach(i=>{ING_MAP[i.id]=i;});
+  LAST_LOAD=Date.now();
+  console.log('[loadAll] ingredientes:',INGS.length,'| recetas:',RECS.length,'| usuarios en mapa:',Object.keys(USERS_MAP).length);
+  const conAudit=RECS.filter(r=>r.actualizado_por);console.log('[loadAll] recetas con actualizado_por:',conAudit.length,conAudit.map(r=>r.nombre+':'+r.actualizado_por));
 }
 
 async function loadElab(){await loadAll();renderElab();}
@@ -752,7 +917,7 @@ function renderElab(){
   const g=document.getElementById('elabGrid');
   const f=RECS.filter(r=>r.tipo==='elaboracion'&&(!s||r.nombre.toLowerCase().includes(s))&&(!l||r.local===l||r.local==='todos'));
   if(!f.length){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="icon">🧪</div><p>No hay elaboraciones todavía.</p></div>`;return;}
-  g.innerHTML=f.map(r=>`<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="meta">${r.categoria||'Elaboración base'}${r.tiempo_prep?' · '+r.tiempo_prep:''}</div><div class="foot"><div><div class="cl">Costo / ${r.unidad_rendimiento||'u'}</div><div class="cv">${fmt(costo(r))}</div></div><span class="badge bol">rinde ${r.rendimiento} ${r.unidad_rendimiento||'u'}</span></div></div>`).join('');
+  g.innerHTML=f.map(r=>{const aud=r.actualizado_por?`<div style="font-size:10px;color:var(--gray);margin-top:6px">Modificado por ${USERS_MAP[r.actualizado_por]||'—'}</div>`:'';return`<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="foot"><div><div class="cl">Costo / ${r.unidad_rendimiento||'u'}</div><div class="cv">${fmt(costo(r))}</div></div><span class="badge bol">rinde ${r.rendimiento} ${r.unidad_rendimiento||'u'}</span></div>${aud}</div>`;}).join('');
 }
 
 function renderPlatos(){
@@ -764,7 +929,8 @@ function renderPlatos(){
   if(!f.length){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="icon">🍽️</div><p>No hay platos todavía.</p></div>`;return;}
   g.innerHTML=f.map(r=>{
     const c=costo(r);const ok=(r.receta_componentes||[]).length>0;
-    return `<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="meta">${r.categoria||''}${r.tiempo_prep?' · '+r.tiempo_prep:''}</div><div class="foot"><div><div class="cl">Costo MP</div><div class="cv">${ok?fmt(c):'Sin costear'}</div></div><span class="badge ${ok?'bg':'bw'}">${ok?'✓ Costeado':'⚠ Sin componentes'}</span></div></div>`;
+    const aud=r.actualizado_por?`<div style="font-size:10px;color:var(--gray);margin-top:6px">Modificado por ${USERS_MAP[r.actualizado_por]||'—'}</div>`:'';
+    return `<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="meta">${r.categoria||''}${r.tiempo_prep?' · '+r.tiempo_prep:''}</div><div class="foot"><div><div class="cl">Costo MP</div><div class="cv">${ok?fmt(c):'Sin costear'}</div></div><span class="badge ${ok?'bg':'bw'}">${ok?'✓ Costeado':'⚠ Sin componentes'}</span></div>${aud}</div>`;
   }).join('');
 }
 
@@ -778,13 +944,33 @@ function renderMenus(){
     const ps=m.menu_pasos||[];
     const ct=ps.reduce((a,p)=>a+costo(p.receta),0);
     const fc=m.precio_venta>0?(ct/m.precio_venta*100).toFixed(1):null;
-    return `<div class="card" onclick="verM(${m.id})">${ltag(m.local)}<h3>${m.nombre}</h3><div class="meta">${ps.length} paso${ps.length!==1?'s':''} · ${m.descripcion||''}</div><div class="foot"><div><div class="cl">Costo total</div><div class="cv">${fmt(ct)}</div></div><div style="text-align:right">${m.precio_venta?`<div class="cl">${fmt(m.precio_venta)} venta</div>`:''} ${fc?`<span class="badge ${fcc(parseFloat(fc))}">${fc}% FC</span>`:'<span class="badge bgr">Sin precio</span>'}</div></div></div>`;
+    return `<div class="card" onclick="verM(${m.id})">${ltag(m.local)}<h3>${m.nombre}</h3><div class="meta">${ps.length} paso${ps.length!==1?'s':''} · ${m.descripcion||''}</div><div class="foot"><div><div class="cl">Costo total</div><div class="cv">${fmt(ct)}</div></div><div style="text-align:right">${m.precio_venta?`<div class="cl">${fmt(m.precio_venta)} neto</div>`:''} ${fc?`<span class="badge ${fcc(parseFloat(fc))}">${fc}% FC</span>`:'<span class="badge bgr">Sin precio</span>'}</div></div></div>`;
   }).join('');
 }
 
-function openElabModal(){eRec=null;document.getElementById('rTitle').textContent='Nueva Elaboración';document.getElementById('rTipo').value='elaboracion';resetRForm();openOv('ovR');}
+async function openElabModal(){
+  await loadAll();
+  eRec=null;
+  document.getElementById('rTitle').textContent='Nueva Sub-elaboración';
+  document.getElementById('rTipo').value='elaboracion';
+  setTimeout(()=>{const h=document.getElementById('compHint');if(h)h.style.display='none';},100);
+  // Sub-elaboraciones no tienen categoría — ocultar esa fila
+  document.getElementById('rCatRow').style.display='none';
+  resetRForm();openOv('ovR');
+}
 window.openElabModal=openElabModal;
-function openPlatoModal(){eRec=null;document.getElementById('rTitle').textContent='Nuevo Plato / Paso';document.getElementById('rTipo').value='plato';resetRForm();openOv('ovR');}
+async function openPlatoModal(){
+  await loadAll();
+  eRec=null;
+  document.getElementById('rTitle').textContent='Nuevo Plato / Paso';
+  document.getElementById('rTipo').value='plato';
+  setTimeout(()=>{const h=document.getElementById('compHint');if(h)h.style.display='inline';},100);
+  // Platos sí tienen categoría — mostrar fila y ocultar opción Sub-elaboración
+  document.getElementById('rCatRow').style.display='';
+  const catSel=document.getElementById('rCat');
+  Array.from(catSel.options).forEach(o=>{o.hidden=o.value==='salsa';});
+  resetRForm();openOv('ovR');
+}
 window.openPlatoModal=openPlatoModal;
 
 function resetRForm(){
@@ -813,7 +999,7 @@ function verR(id){
   document.getElementById('vrContent').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--sand-l)">
       <div>${ltag(r.local)}<h2 style="font-family:'Playfair Display',serif;font-size:22px;margin-top:4px">${r.nombre}</h2>
-      <div style="color:var(--gray);font-size:13px;margin-top:4px">${r.tipo==='elaboracion'?'Elaboración':'Plato'} · ${r.categoria||''} · rinde ${r.rendimiento} ${r.unidad_rendimiento||''} · ${r.tiempo_prep||'—'}</div></div>
+      <div style="color:var(--gray);font-size:13px;margin-top:4px">${r.tipo==='elaboracion'?'Sub-elaboración':'Plato'} · ${r.categoria||''} · rinde ${r.rendimiento} ${r.unidad_rendimiento||''} · ${r.tiempo_prep||'—'}</div></div>
       <div style="display:flex;gap:6px"><button class="btn bs" style="padding:7px 12px;font-size:12px" onclick="editR(${r.id});closeOv('ovVR')">✏️ Editar</button><button class="bd" onclick="delR(${r.id})">🗑</button></div>
     </div>
     <div class="dg">
@@ -830,10 +1016,17 @@ function verR(id){
 }
 window.verR=verR;
 
-function editR(id){
+async function editR(id){
+  await loadAll();
   const r=RECS.find(x=>x.id===id);if(!r)return;
   eRec=id;
-  document.getElementById('rTitle').textContent=r.tipo==='elaboracion'?'Editar Elaboración':'Editar Plato';
+  // Mostrar/ocultar fila de categoría según tipo
+  document.getElementById('rCatRow').style.display=r.tipo==='plato'?'':'none';
+  if(r.tipo==='plato'){
+    const catSel=document.getElementById('rCat');
+    Array.from(catSel.options).forEach(o=>{o.hidden=o.value==='salsa';});
+  }
+  document.getElementById('rTitle').textContent=r.tipo==='elaboracion'?'Editar Sub-elaboración':'Editar Plato';
   document.getElementById('rTipo').value=r.tipo;
   document.getElementById('rNombre').value=r.nombre||'';document.getElementById('rLocal').value=r.local||'todos';
   document.getElementById('rCat').value=r.categoria||'';document.getElementById('rRend').value=r.rendimiento||1;
@@ -850,58 +1043,83 @@ async function delR(id){
 }
 window.delR=delR;
 
-function addComp(tipo){addCompRow({tipo_componente:tipo});}
+async function addComp(tipo){await loadAll();addCompRow({tipo_componente:tipo});}
 window.addComp=addComp;
 
 function addCompRow(c={}){
   const tipo=c.tipo_componente||'ingrediente';const tr=document.createElement('tr');
   let opts='';
   if(tipo==='ingrediente'){
-    opts=INGS.filter(i=>i.validado&&i.activo).map(i=>{
-      const und=i.unidad||'';
+    // Mostrar cualquier ingrediente que tenga nombre y no esté explícitamente sin validar
+    opts=INGS.filter(i=>i.nombre&&i.validado!=false).map(i=>{
       return `<option value="${i.id}" ${c.ingrediente_id===i.id?'selected':''}>${i.nombre}${i.formato?' — '+i.formato:''}</option>`;
     }).join('');
   } else {
-    opts=RECS.filter(r=>r.tipo==='elaboracion'&&r.activo&&r.id!==eRec).map(r=>`<option value="${r.id}" ${c.sub_receta_id===r.id?'selected':''}>${r.nombre}</option>`).join('');
+    const subelab=RECS.filter(r=>r.tipo==='elaboracion'&&r.activo!==false&&r.id!==eRec);
+    opts=subelab.map(r=>`<option value="${r.id}" ${c.sub_receta_id===r.id?'selected':''}>${r.nombre}</option>`).join('');
+    if(!opts) opts='<option disabled>— Sin sub-elaboraciones cargadas —</option>';
   }
   tr.dataset.tipo=tipo;
-  // Para ingredientes, la unidad se auto-completa al seleccionar y es la unidad base
   const unidadVal=c.unidad||'';
+  // El campo de unidad para ingredientes: select con todas las unidades.
+  // Se actualiza con ★ al elegir el ingrediente (llenarUnidadComp).
+  const optsUnd=TODAS_UNIDADES.map(u=>`<option value="${u}" ${(unidadVal||'g')===u?'selected':''}>${u}</option>`).join('');
+  // Tanto ingredientes como sub-elaboraciones usan select de unidades
+  const undCell=`<select class="cu" onchange="updPrev()" style="width:72px;padding:5px 4px;font-size:12px;border:1px solid var(--sand);border-radius:6px;background:var(--cream)">${optsUnd}</select>`;
   tr.innerHTML=`<td><span class="badge ${tipo==='ingrediente'?'bol':'bbl'}" style="font-size:10px;white-space:nowrap">${tipo==='ingrediente'?'🧂':'🧪'}</span></td>
     <td style="min-width:180px"><select class="cr" onchange="onCompSelect(this);updPrev()"><option value="">Seleccionar...</option>${opts}</select></td>
     <td><input type="number" class="cq" value="${c.cantidad||''}" placeholder="0" step="0.001" min="0" oninput="updPrev()" style="width:75px"></td>
-    <td><select class="cu" style="width:80px;padding:5px 4px;font-size:12px;border:1px solid var(--sand);border-radius:6px;background:var(--cream)">
-      <option value="kg" \${(c.unidad||'kg')==='kg'?'selected':''}>kg</option>
-      <option value="lt" \${(c.unidad||'')==='lt'?'selected':''}>lt</option>
-      <option value="g" \${(c.unidad||'')==='g'?'selected':''}>g</option>
-      <option value="ml" \${(c.unidad||'')==='ml'?'selected':''}>ml</option>
-      <option value="unidad" \${(c.unidad||'')==='unidad'?'selected':''}>unidad</option>
-      <option value="docena" \${(c.unidad||'')==='docena'?'selected':''}>docena</option>
-    </select></td>
+    <td>${undCell}</td>
     <td class="cc price" style="min-width:65px">$0</td>
     <td><button class="bd" onclick="this.closest('tr').remove();updPrev()">✕</button></td>`;
   document.getElementById('compRows').appendChild(tr);
-  // Si ya tiene ingrediente_id, pre-llenar la unidad
+  // Poblar el select de unidades según tipo
   if(tipo==='ingrediente'&&c.ingrediente_id){
     const sel=tr.querySelector('.cr');
     sel.value=c.ingrediente_id;
-    llenarUnidadComp(tr,c.ingrediente_id);
+    llenarUnidadComp(tr,c.ingrediente_id,unidadVal);
+  } else if(tipo==='receta'&&c.sub_receta_id){
+    const sel=tr.querySelector('.cr');
+    sel.value=c.sub_receta_id;
+    llenarUnidadSubRec(tr,c.sub_receta_id,unidadVal);
   }
   updPrev();
 }
 
-// Cuando se selecciona un ingrediente en la receta, auto-llena la unidad base
+// Cuando se selecciona un ingrediente en la receta, actualiza el select de unidades compatibles
 function onCompSelect(sel){
   const tr=sel.closest('tr');
-  if(tr.dataset.tipo!=='ingrediente') return;
-  llenarUnidadComp(tr,parseInt(sel.value)||0);
+  const id=parseInt(sel.value)||0;
+  if(tr.dataset.tipo==='ingrediente') llenarUnidadComp(tr,id,'');
+  else llenarUnidadSubRec(tr,id,'');
 }
 window.onCompSelect=onCompSelect;
 
-function llenarUnidadComp(tr,ingId){
-  const i=INGS.find(x=>x.id===ingId);
-  const cuInput=tr.querySelector('.cu');
-  if(cuInput&&i) cuInput.value=i.unidad||'';
+const TODAS_UNIDADES=['g','kg','ml','l','unidad','docena'];
+
+// Pobla el select para ingredientes — usa unidad base del ingrediente con ★
+function llenarUnidadComp(tr,ingId,undPrevia=''){
+  const i=ING_MAP[ingId]||INGS.find(x=>x.id===ingId);
+  const sel=tr.querySelector('.cu');
+  if(!sel||sel.tagName!=='SELECT') return;
+  if(!i){sel.innerHTML='<option value="">—</option>';return;}
+  const base=i.unidad||'';
+  const elegida=undPrevia||base||'g';
+  sel.innerHTML=TODAS_UNIDADES.map(u=>{
+    return `<option value="${u}" ${elegida===u?'selected':''}>${u===base?u+' ★':u}</option>`;
+  }).join('');
+}
+
+// Pobla el select para sub-elaboraciones — usa unidad_rendimiento de la sub-receta con ★
+function llenarUnidadSubRec(tr,recId,undPrevia=''){
+  const r=RECS.find(x=>x.id===recId);
+  const sel=tr.querySelector('.cu');
+  if(!sel||sel.tagName!=='SELECT') return;
+  const base=r?r.unidad_rendimiento||'porcion':'porcion';
+  const elegida=undPrevia||base;
+  sel.innerHTML=TODAS_UNIDADES.map(u=>{
+    return `<option value="${u}" ${elegida===u?'selected':''}>${u===base?u+' ★':u}</option>`;
+  }).join('');
 }
 
 function updPrev(){
@@ -909,8 +1127,18 @@ function updPrev(){
   document.querySelectorAll('#compRows tr').forEach(tr=>{
     const tipo=tr.dataset.tipo;const ref=parseInt(tr.querySelector('.cr')?.value)||0;const qty=parseFloat(tr.querySelector('.cq')?.value)||0;
     let lc=0;
-    if(tipo==='ingrediente'){const i=INGS.find(x=>x.id===ref);lc=costoUnitario(i)*qty;}
-    else{const r=RECS.find(x=>x.id===ref);lc=costo(r)*qty;}
+    if(tipo==='ingrediente'){
+      const i=ING_MAP[ref]||INGS.find(x=>x.id===ref);
+      const undR=tr.querySelector('.cu')?.value||'';
+      lc=costoConversion(i,qty,undR);
+    } else {
+      const r=RECS.find(x=>x.id===ref);
+      const undR=tr.querySelector('.cu')?.value||'';
+      const undBase=r?r.unidad_rendimiento||'porcion':'porcion';
+      // Convertir si cocina usó una unidad distinta a la unidad de rendimiento
+      const cantConv=convertir(qty,undR,undBase)??qty;
+      lc=costo(r)*cantConv;
+    }
     tr.querySelector('.cc').textContent=fmt(lc);tot+=lc;
   });
   const rend=parseFloat(document.getElementById('rRend').value)||1;
@@ -924,7 +1152,7 @@ window.updPrev=updPrev;
 async function saveRec(){
   const nom=document.getElementById('rNombre').value.trim();if(!nom){toast('Ingresá un nombre');return;}
   const tipo=document.getElementById('rTipo').value;
-  const data={nombre:nom,tipo,local:document.getElementById('rLocal').value,categoria:document.getElementById('rCat').value,rendimiento:parseFloat(document.getElementById('rRend').value)||1,tiempo_prep:document.getElementById('rTiempo').value,unidad_rendimiento:document.getElementById('rUnd').value,procedimiento:document.getElementById('rProc').value,activo:true,creado_por:CU.id,actualizado_en:new Date().toISOString()};
+  const ahora=new Date().toISOString();const data={nombre:nom,tipo,local:document.getElementById('rLocal').value,categoria:document.getElementById('rCat').value,rendimiento:parseFloat(document.getElementById('rRend').value)||1,tiempo_prep:document.getElementById('rTiempo').value,unidad_rendimiento:document.getElementById('rUnd').value,procedimiento:document.getElementById('rProc').value,activo:true,creado_por:CU.id,actualizado_por:CU.id,actualizado_en:ahora};
   const comps=[];
   document.querySelectorAll('#compRows tr').forEach(tr=>{
     const t=tr.dataset.tipo;const ref=parseInt(tr.querySelector('.cr')?.value)||0;const qty=parseFloat(tr.querySelector('.cq')?.value)||0;
@@ -935,7 +1163,7 @@ async function saveRec(){
   if(eRec){await api(`recetas?id=eq.${eRec}`,'PATCH',data);await api(`receta_componentes?receta_id=eq.${eRec}`,'DELETE');toast('Guardado ✓');}
   else{const res=await api('recetas','POST',data);if(!res||!res.length){toast('Error');return;}rid=res[0].id;toast('Creado ✓');}
   if(comps.length) await api('receta_componentes','POST',comps.map(c=>({...c,receta_id:rid})));
-  closeOv('ovR');await loadAll();if(tipo==='elaboracion')renderElab();else renderPlatos();
+  closeOv('ovR');await loadAll(true);if(tipo==='elaboracion')renderElab();else renderPlatos();
 }
 window.saveRec=saveRec;
 
@@ -977,7 +1205,7 @@ function rendPlatDisp(){
   const ya=MPASOS.map(p=>p.receta_id);
   const pl=RECS.filter(r=>r.tipo==='plato'&&(r.receta_componentes||[]).length>0&&(!s||r.nombre.toLowerCase().includes(s)));
   const c=document.getElementById('platDisp');
-  if(!pl.length){c.innerHTML='<div style="color:var(--gray);font-size:12px;padding:14px">No hay platos costeados</div>';return;}
+  if(!pl.length){c.innerHTML='<div style="color:var(--gray);font-size:12px;padding:14px">No hay platos costeados disponibles.<br><small>Un plato debe tener al menos un componente para aparecer acá.</small></div>';return;}
   c.innerHTML=pl.map(r=>{
     const ya2=ya.includes(r.id);
     return `<div class="po ${ya2?'added':''}" onclick="agrPaso(${r.id})"><div><div style="font-size:13px;font-weight:500">${r.nombre}</div><div style="font-size:11px;color:var(--gray)">${LL[r.local]||r.local} · ${r.categoria||''}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:var(--olive)">${fmt(costo(r))}</div><div style="font-size:10px;color:${ya2?'var(--gray)':'var(--olive)'}">${ya2?'ya agregado':'+ agregar'}</div></div></div>`;
@@ -1008,7 +1236,7 @@ function updMenu(){
   const fc=precio?(ct/precio*100).toFixed(1):null;
   const rows=MPASOS.map((p,i)=>{const r=p.receta||RECS.find(x=>x.id===p.receta_id);return `<div class="pr"><span>${i+1}. ${r?.nombre||''}</span><span>${fmt(costo(r))}</span></div>`;}).join('');
   prev.style.display='block';
-  prev.innerHTML=`${rows}<div class="tr"><span>Costo total MP</span><span>${fmt(ct)}</span></div>${precio?`<div class="fr"><span>Precio de venta</span><span>${fmt(precio)}</span></div><div class="fr"><span>Food Cost</span><span><strong>${fc}%</strong></span></div><div class="fr"><span>Margen bruto</span><span style="color:var(--rust)"><strong>${fmt(precio-ct)}</strong></span></div>`:''}`;
+  prev.innerHTML=`${rows}<div class="tr"><span>Costo total MP</span><span>${fmt(ct)}</span></div>${precio?`<div class="fr"><span>Px Venta Neto</span><span>${fmt(precio)}</span></div><div class="fr"><span>Food Cost</span><span><strong>${fc}%</strong></span></div><div class="fr"><span>Margen bruto</span><span style="color:var(--rust)"><strong>${fmt(precio-ct)}</strong></span></div>`:''}`;
 }
 window.updMenu=updMenu;
 
@@ -1043,7 +1271,7 @@ function verM(id){
       <div><div class="db"><h4>Costeo</h4></div>
         <div class="cb">
           <div class="row"><span>Costo total MP</span><span>${fmt(ct)}</span></div>
-          <div class="row"><span>Precio de venta</span><span>${m.precio_venta?fmt(m.precio_venta):'No cargado'}</span></div>
+          <div class="row"><span>Px Venta Neto</span><span>${m.precio_venta?fmt(m.precio_venta):'No cargado'}</span></div>
           ${fc?`<div class="row"><span>Food Cost</span><span><strong>${fc}%</strong></span></div><div class="row tot"><span>Margen bruto</span><span class="v">${fmt(m.precio_venta-ct)}</span></div>`:''}
         </div>
         ${fc?`<div style="text-align:center;margin-top:12px"><span class="badge ${fcc(fcN)}" style="font-size:14px;padding:6px 16px">${fcN<=30?'✓ Food cost saludable':fcN<=40?'⚠ Revisar':'✗ Food cost alto'}</span></div>`:''}
@@ -1165,7 +1393,7 @@ async function saveIng(validar=false){
     subfamilia:document.getElementById('iSub').value||null,
     codigo_hiopos:document.getElementById('iCod').value.trim()||null,
     costo:costoEnv,
-    unidad:document.getElementById('iUnd').value,
+    unidad:(()=>{const u=document.getElementById('iUnd').value;return u==='lt'?'l':u;})(),
     cantidad_por_presentacion:cantBase,
     validado:validar,
     validado_por:validar?CU.id:null,
@@ -1173,8 +1401,9 @@ async function saveIng(validar=false){
     actualizado_en:new Date().toISOString()
   };
   if(eIng){await api(`ingredientes?id=eq.${eIng}`,'PATCH',data);toast(validar?'✓ Validado — disponible para cocina':'Guardado sin validar');}
-  else{await api('ingredientes','POST',data);toast(validar?'✓ Creado y validado':'Creado — pendiente de validación');}
+  else{const body={...data,activo:true};await api('ingredientes','POST',body);toast(validar?'✓ Creado y validado':'Creado — pendiente de validación');}
   closeOv('ovI');
+  LAST_LOAD=0; // invalidar caché para que loadAll recargue
   await cargarFamiliasMap();
   await loadIng();
 }
@@ -1231,6 +1460,74 @@ function cancelCSV(){document.getElementById('csvWrap').style.display='none';doc
 window.cancelCSV=cancelCSV;
 
 // USUARIOS
+function switchAdminTab(tab){
+  document.getElementById('panelUsuarios').style.display=tab==='usuarios'?'block':'none';
+  document.getElementById('panelLocales').style.display=tab==='locales'?'block':'none';
+  document.getElementById('tabUsuarios').classList.toggle('active',tab==='usuarios');
+  document.getElementById('tabLocales').classList.toggle('active',tab==='locales');
+  if(tab==='locales') renderLocalesAdmin();
+}
+window.switchAdminTab=switchAdminTab;
+
+let eLocal=null;
+
+function renderLocalesAdmin(){
+  const tbody=document.getElementById('localesTbody');
+  if(!tbody) return;
+  tbody.innerHTML=LOCALES.map(l=>`<tr>
+    <td><strong>${l.nombre}</strong></td>
+    <td><code style="font-size:12px;background:var(--cream);padding:2px 6px;border-radius:4px">${l.slug}</code></td>
+    <td><span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:${l.color};vertical-align:middle;margin-right:6px"></span>${l.color}</td>
+    <td><span class="badge ${l.activo?'bg':'bgr'}">${l.activo?'Activo':'Inactivo'}</span></td>
+    <td style="display:flex;gap:4px"><button class="bsm" onclick="editLocal(${l.id})">✏️</button><button class="bd" onclick="delLocal(${l.id})">🗑</button></td>
+  </tr>`).join('');
+}
+
+function openLocalModal(){
+  eLocal=null;
+  document.getElementById('lTitle').textContent='Nuevo Local';
+  document.getElementById('lNom').value='';
+  document.getElementById('lSlug').value='';
+  document.getElementById('lColor').value='#8B1A1A';
+  document.getElementById('lAct').value='true';
+  openOv('ovL');
+}
+window.openLocalModal=openLocalModal;
+
+function editLocal(id){
+  const l=LOCALES.find(x=>x.id===id);if(!l)return;eLocal=id;
+  document.getElementById('lTitle').textContent='Editar Local';
+  document.getElementById('lNom').value=l.nombre||'';
+  document.getElementById('lSlug').value=l.slug||'';
+  document.getElementById('lColor').value=l.color||'#8B1A1A';
+  document.getElementById('lAct').value=l.activo?'true':'false';
+  openOv('ovL');
+}
+window.editLocal=editLocal;
+
+async function saveLocal(){
+  const nom=document.getElementById('lNom').value.trim();
+  const slug=document.getElementById('lSlug').value.trim().toLowerCase().replace(/\s+/g,'-');
+  if(!nom||!slug){toast('Completá nombre y slug');return;}
+  const data={nombre:nom,slug,color:document.getElementById('lColor').value,activo:document.getElementById('lAct').value==='true'};
+  if(eLocal){await api(`locales?id=eq.${eLocal}`,'PATCH',data);toast('Local actualizado ✓');}
+  else{await api('locales','POST',data);toast('Local creado ✓');}
+  closeOv('ovL');
+  await loadLocales();
+  renderLocalesAdmin();
+}
+window.saveLocal=saveLocal;
+
+async function delLocal(id){
+  const l=LOCALES.find(x=>x.id===id);
+  if(!confirm(`¿Eliminar el local "${l?.nombre}"? Esta acción no se puede deshacer.`)) return;
+  await api(`locales?id=eq.${id}`,'DELETE');
+  toast('Local eliminado');
+  await loadLocales();
+  renderLocalesAdmin();
+}
+window.delLocal=delLocal;
+
 async function loadUsers(){
   USERS=await api('usuarios?select=*&order=rol.asc,nombre.asc')||[];
   document.getElementById('usersTbody').innerHTML=USERS.map(u=>`<tr><td><strong>${u.nombre}</strong></td><td>@${u.usuario}</td><td>${RL[u.rol]||u.rol}</td><td><span class="badge ${u.activo?'bg':'bgr'}">${u.activo?'Activo':'Inactivo'}</span></td><td style="display:flex;gap:4px">${u.id!==CU.id?`<button class="bsm" onclick="editUser(${u.id})">✏️</button><button class="bd" onclick="delUser(${u.id})">🗑</button>`:'<span style="color:var(--gray);font-size:11px">tu cuenta</span>'}</td></tr>`).join('');
@@ -1269,6 +1566,36 @@ async function delUser(id){
   await api(`usuarios?id=eq.${id}`,'DELETE');toast('Eliminado');await loadUsers();
 }
 window.delUser=delUser;
+
+async function diagIngredientes(){
+  const box=document.getElementById('diagBox');
+  box.style.display='block';
+  box.textContent='Consultando Supabase...';
+
+  // Query sin ningún filtro
+  const r1=await api('ingredientes?select=id,nombre,validado,activo&limit=20&order=nombre.asc');
+  if(!r1){box.textContent='ERROR: No se pudo conectar con Supabase. Revisá las credenciales.';return;}
+
+  let txt=`Total sin filtro (primeros 20): ${r1.length} registros\n\n`;
+  r1.forEach(i=>{
+    txt+=`ID ${i.id}: ${i.nombre}\n`;
+    txt+=`  validado: ${JSON.stringify(i.validado)} (${typeof i.validado})\n`;
+    txt+=`  activo:   ${JSON.stringify(i.activo)} (${typeof i.activo})\n`;
+  });
+
+  // Cuántos pasan el filtro ==true
+  const pasanValidado = r1.filter(i=>i.validado==true);
+  const pasanActivo   = r1.filter(i=>i.activo!==false);
+  const pasanAmbos    = r1.filter(i=>i.validado==true&&i.activo!==false&&i.nombre);
+  txt+=`\n--- Filtros del dropdown ---\n`;
+  txt+=`validado==true:              ${pasanValidado.length}\n`;
+  txt+=`activo!==false:              ${pasanActivo.length}\n`;
+  txt+=`ambos + nombre:              ${pasanAmbos.length}\n`;
+  txt+=`\n(Estos son los que aparecen en el selector de recetas)`;
+
+  box.textContent=txt;
+}
+window.diagIngredientes=diagIngredientes;
 
 checkSession();
 })();
