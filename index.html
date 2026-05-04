@@ -1332,16 +1332,19 @@ function actualizarInfoUnidad(){
   const und=document.getElementById('iUnd').value;
   const cant=parseFloat(document.getElementById('iCantBase').value)||0;
   const costo=parseFloat(document.getElementById('iCosto').value)||0;
-  const fmt=document.getElementById('iFmt').value||'este envase';
+  const fmtNom=document.getElementById('iFmt').value||'este envase';
   const info=document.getElementById('iUndInfo');
   const cuInput=document.getElementById('iCostoUnitario');
 
   if(cant>0){
     info.style.display='block';
-    const cu=costo>0?`<strong>$${Math.round(costo/cant).toLocaleString('es-AR')} / ${und}</strong>`:`— (ingresá el costo)`;
-    info.innerHTML=`<strong>${fmt}</strong> contiene <strong>${cant} ${und}</strong>. Costo por ${und}: ${cu}.<br><span style="color:var(--gray)">En recetas, cocina escribe la cantidad en ${und} directamente.</span>`;
+    const cuVal=costo>0?(costo/cant):0;
+    // Mostrar decimales inteligentemente: si <10 usar 2 decimales, si <100 usar 1, sino sin decimales
+    const cuFmt=cuVal===0?'—':cuVal<10?cuVal.toFixed(2):cuVal<100?cuVal.toFixed(1):Math.round(cuVal).toString();
+    const cuStr=costo>0?`<strong>$${parseFloat(cuFmt).toLocaleString('es-AR',{minimumFractionDigits:cuVal<10?2:0})} / ${und}</strong>`:`— (ingresá el costo)`;
+    info.innerHTML=`<strong>${fmtNom}</strong> contiene <strong>${cant} ${und}</strong>. Costo por ${und}: ${cuStr}.<br><span style="color:var(--gray)">En recetas, cocina escribe la cantidad en ${und} directamente.</span>`;
     if(costo>0&&cant>0){
-      cuInput.value='$'+Math.round(costo/cant).toLocaleString('es-AR');
+      cuInput.value='$'+cuVal.toLocaleString('es-AR',{minimumFractionDigits:cuVal<10?2:cuVal<100?1:0,maximumFractionDigits:cuVal<10?4:cuVal<100?2:0});
     } else {
       cuInput.value='';
     }
