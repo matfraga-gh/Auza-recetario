@@ -422,7 +422,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="frow">
       <div class="fg"><label>Nombre</label><input type="text" id="rNombre" placeholder="Ej: Pasta de berenjena ahumada"></div>
       <div class="fg"><label>Local de referencia</label>
-        <select id="rLocal"><option value="todos">Transversal (todos)</option>
+        <select id="rLocal" onchange="onCambiarLocalPlato()"><option value="todos">Transversal (todos)</option>
           <option value="azafran">Azafrán</option><option value="trapiche">Espacio Trapiche</option>
           <option value="nieto">Nieto Senetiner</option><option value="vinobien">Vinobien</option><option value="cobos">Viña Cobos</option>
         </select>
@@ -443,6 +443,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
       <div class="fg"><label>Unidad de rendimiento</label>
         <select id="rUnd"><option value="porcion">porción</option><option value="kg">kg</option><option value="lt">lt</option><option value="unidad">unidad</option></select>
       </div>
+    </div>
+    <div class="frow" id="rPrecioRow" style="display:none">
+      <div class="fg"><label>Precio de venta neto ($)</label><input type="number" id="rPrecio" placeholder="0" min="0" step="0.01" oninput="updPrev()"></div>
+      <div class="fg" style="align-self:end"><div id="rFcHint" style="font-size:12px;color:var(--gray);padding:8px 0">Cargá el costo y el precio para ver el foodcost</div></div>
     </div>
     <div class="fg full" style="margin-bottom:4px"><label>Procedimiento / Técnica</label><textarea id="rProc" placeholder="Descripción del proceso..."></textarea></div>
     <div class="cs">
@@ -478,7 +482,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="frow">
       <div class="fg"><label>Nombre del menú</label><input type="text" id="mNombre" placeholder="Ej: Paseo Federal"></div>
       <div class="fg"><label>Local</label>
-        <select id="mLocal"><option value="azafran">Azafrán</option><option value="trapiche">Espacio Trapiche</option>
+        <select id="mLocal" onchange="rendPlatDisp()"><option value="azafran">Azafrán</option><option value="trapiche">Espacio Trapiche</option>
           <option value="nieto">Nieto Senetiner</option><option value="vinobien">Vinobien</option><option value="cobos">Viña Cobos</option>
         </select>
       </div>
@@ -863,7 +867,7 @@ async function loadElab(){await loadAll();renderElab();}
 async function loadPlatos(){await loadAll();renderPlatos();}
 async function loadMenus(){
   await loadAll();
-  const m=await api('recetas?select=*,menu_pasos(*,receta:receta_id(*,receta_componentes(*)))&tipo=eq.menu&activo=eq.true&order=nombre.asc');
+  const m=await api('recetas?select=*,menu_pasos!menu_pasos_menu_id_fkey(*,receta:receta_id(*,receta_componentes(*)))&tipo=eq.menu&activo=eq.true&order=nombre.asc');
   MENUS=m||[];renderMenus();
 }
 let ingPage=0;const ING_PAGE=50;let ingDebounce=null;
@@ -988,8 +992,19 @@ function renderPlatos(){
   if(!f.length){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="icon">🍽️</div><p>No hay platos todavía.</p></div>`;return;}
   g.innerHTML=f.map(r=>{
     const c=costo(r);const ok=(r.receta_componentes||[]).length>0;
+    const pv=parseFloat(r.precio_venta)||0;
+    const fc=pv>0&&ok?(c/pv*100).toFixed(1):null;
     const aud=r.actualizado_por?`<div style="font-size:10px;color:var(--gray);margin-top:6px">Modificado por ${USERS_MAP[r.actualizado_por]||'—'}</div>`:'';
-    return `<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="meta">${r.categoria||''}${r.tiempo_prep?' · '+r.tiempo_prep:''}</div><div class="foot"><div><div class="cl">Costo MP</div><div class="cv">${ok?fmt(c):'Sin costear'}</div></div><span class="badge ${ok?'bg':'bw'}">${ok?'✓ Costeado':'⚠ Sin componentes'}</span></div>${aud}</div>`;
+    // Bloque derecho del footer: depende si tiene precio o no
+    let derecha;
+    if(!ok){
+      derecha=`<span class="badge bw">⚠ Sin componentes</span>`;
+    }else if(pv>0){
+      derecha=`<div style="text-align:right"><div class="cl">${fmt(pv)} neto</div><span class="badge ${fcc(parseFloat(fc))}">${fc}% FC</span></div>`;
+    }else{
+      derecha=`<div style="text-align:right"><span class="badge bg">✓ Costeado</span><div class="cl" style="margin-top:4px">Sin precio</div></div>`;
+    }
+    return `<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="meta">${r.categoria||''}${r.tiempo_prep?' · '+r.tiempo_prep:''}</div><div class="foot"><div><div class="cl">Costo MP</div><div class="cv">${fmt(c)}</div></div>${derecha}</div>${aud}</div>`;
   }).join('');
 }
 
@@ -1006,6 +1021,9 @@ function renderMenus(){
     return `<div class="card" onclick="verM(${m.id})">${ltag(m.local)}<h3>${m.nombre}</h3><div class="meta">${ps.length} paso${ps.length!==1?'s':''} · ${m.descripcion||''}</div><div class="foot"><div><div class="cl">Costo total</div><div class="cv">${fmt(ct)}</div></div><div style="text-align:right">${m.precio_venta?`<div class="cl">${fmt(m.precio_venta)} neto</div>`:''} ${fc?`<span class="badge ${fcc(parseFloat(fc))}">${fc}% FC</span>`:'<span class="badge bgr">Sin precio</span>'}</div></div></div>`;
   }).join('');
 }
+window.renderElab=renderElab;
+window.renderPlatos=renderPlatos;
+window.renderMenus=renderMenus;
 
 async function openElabModal(){
   await loadAll();
@@ -1015,6 +1033,7 @@ async function openElabModal(){
   setTimeout(()=>{const h=document.getElementById('compHint');if(h)h.style.display='none';},100);
   // Sub-elaboraciones no tienen categoría — ocultar esa fila
   document.getElementById('rCatRow').style.display='none';
+  document.getElementById('rPrecioRow').style.display='none';
   resetRForm();openOv('ovR');
 }
 window.openElabModal=openElabModal;
@@ -1026,6 +1045,7 @@ async function openPlatoModal(){
   setTimeout(()=>{const h=document.getElementById('compHint');if(h)h.style.display='inline';},100);
   // Platos sí tienen categoría — mostrar fila y ocultar opción Sub-elaboración
   document.getElementById('rCatRow').style.display='';
+  document.getElementById('rPrecioRow').style.display='';
   const catSel=document.getElementById('rCat');
   Array.from(catSel.options).forEach(o=>{o.hidden=o.value==='salsa';});
   resetRForm();openOv('ovR');
@@ -1033,7 +1053,7 @@ async function openPlatoModal(){
 window.openPlatoModal=openPlatoModal;
 
 function resetRForm(){
-  ['rNombre','rTiempo','rProc'].forEach(id=>document.getElementById(id).value='');
+  ['rNombre','rTiempo','rProc','rPrecio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('rLocal').value='todos';document.getElementById('rCat').value='';
   document.getElementById('rRend').value='1';document.getElementById('rUnd').value='porcion';
   document.getElementById('compRows').innerHTML='';updPrev();
@@ -1055,6 +1075,22 @@ function verR(id){
     }
     return `<li><span>${cp.grupo?`<small style="color:var(--gray)">${cp.grupo} · </small>`:''}${nom} <small style="color:var(--gray)">${cp.cantidad} ${cp.unidad}</small></span><span class="ic">${fmt(lc)}</span></li>`;
   }).join('');
+  // Bloque de costeo: agregar precio y foodcost si es plato con precio
+  let bloqueCosteo=`
+          <div class="row"><span>Costo total componentes</span><span>${fmt(c*(r.rendimiento||1))}</span></div>
+          <div class="row"><span>Rinde</span><span>${r.rendimiento} ${r.unidad_rendimiento||'porción'}</span></div>
+          <div class="row tot"><span>Costo por unidad</span><span class="v">${fmt(c)}</span></div>`;
+  if(r.tipo==='plato'&&r.precio_venta>0){
+    const fc=(c/r.precio_venta*100);
+    const margen=r.precio_venta-c;
+    const cls=fcc(fc);
+    bloqueCosteo+=`
+          <div class="row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--sand-l)"><span>Precio venta neto</span><span>${fmt(r.precio_venta)}</span></div>
+          <div class="row"><span>Food Cost</span><span><span class="badge ${cls}">${fc.toFixed(1)}%</span></span></div>
+          <div class="row tot"><span>Margen bruto</span><span class="v" style="color:var(--olive)">${fmt(margen)}</span></div>`;
+  }else if(r.tipo==='plato'){
+    bloqueCosteo+=`<div class="row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--sand-l);color:var(--gray);font-size:12px"><span>Sin precio de venta cargado</span></div>`;
+  }
   document.getElementById('vrContent').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--sand-l)">
       <div>${ltag(r.local)}<h2 style="font-family:'Playfair Display',serif;font-size:22px;margin-top:4px">${r.nombre}</h2>
@@ -1064,10 +1100,7 @@ function verR(id){
     <div class="dg">
       <div><div class="db"><h4>Componentes (${comps.length})</h4></div><ul class="il">${rows||'<li style="color:var(--gray)">Sin componentes</li>'}</ul></div>
       <div><div class="db"><h4>Procedimiento</h4></div><p style="font-size:13px;line-height:1.7;color:var(--gray)">${r.procedimiento||'Sin descripción'}</p>
-        <div class="cb" style="margin-top:12px">
-          <div class="row"><span>Costo total componentes</span><span>${fmt(c*(r.rendimiento||1))}</span></div>
-          <div class="row"><span>Rinde</span><span>${r.rendimiento} ${r.unidad_rendimiento||'porción'}</span></div>
-          <div class="row tot"><span>Costo por unidad</span><span class="v">${fmt(c)}</span></div>
+        <div class="cb" style="margin-top:12px">${bloqueCosteo}
         </div>
       </div>
     </div>`;
@@ -1081,6 +1114,7 @@ async function editR(id){
   eRec=id;
   // Mostrar/ocultar fila de categoría según tipo
   document.getElementById('rCatRow').style.display=r.tipo==='plato'?'':'none';
+  document.getElementById('rPrecioRow').style.display=r.tipo==='plato'?'':'none';
   if(r.tipo==='plato'){
     const catSel=document.getElementById('rCat');
     Array.from(catSel.options).forEach(o=>{o.hidden=o.value==='salsa';});
@@ -1091,6 +1125,7 @@ async function editR(id){
   document.getElementById('rCat').value=r.categoria||'';document.getElementById('rRend').value=r.rendimiento||1;
   document.getElementById('rTiempo').value=r.tiempo_prep||'';document.getElementById('rUnd').value=r.unidad_rendimiento||'porcion';
   document.getElementById('rProc').value=r.procedimiento||'';document.getElementById('compRows').innerHTML='';
+  document.getElementById('rPrecio').value=r.precio_venta||'';
   (r.receta_componentes||[]).forEach(c=>addCompRow(c));updPrev();openOv('ovR');
 }
 window.editR=editR;
@@ -1105,6 +1140,36 @@ window.delR=delR;
 async function addComp(tipo){await loadAll();addCompRow({tipo_componente:tipo});}
 window.addComp=addComp;
 
+// Al cambiar el local del plato, re-poblar las sub-elaboraciones disponibles
+window.onCambiarLocalPlato=function(){
+  const localActual=document.getElementById('rLocal').value||'todos';
+  // Re-evaluar cada fila de tipo "receta"
+  document.querySelectorAll('#compRows tr').forEach(tr=>{
+    if(tr.dataset.tipo!=='receta')return;
+    const sel=tr.querySelector('.cr');
+    const valActual=parseInt(sel.value)||0;
+    // Re-armar opciones
+    const subelab=RECS.filter(r=>{
+      if(r.tipo!=='elaboracion'||r.activo===false||r.id===eRec)return false;
+      return r.local==='todos'||r.local===localActual;
+    });
+    const opts='<option value="">Seleccionar...</option>'+subelab.map(r=>
+      `<option value="${r.id}">${r.nombre}${r.local==='todos'?' (transversal)':''}</option>`
+    ).join('');
+    sel.innerHTML=opts;
+    // Si la sub-elab seleccionada antes ya no está disponible, marcarla como inválida visualmente
+    if(valActual&&!subelab.find(r=>r.id===valActual)){
+      const recActual=RECS.find(r=>r.id===valActual);
+      if(recActual){
+        sel.innerHTML+=`<option value="${valActual}" selected style="color:#9C2A1C">⚠ ${recActual.nombre} (no es de este local)</option>`;
+      }
+    }else if(valActual){
+      sel.value=valActual;
+    }
+  });
+  updPrev();
+};
+
 function addCompRow(c={}){
   const tipo=c.tipo_componente||'ingrediente';const tr=document.createElement('tr');
   let opts='';
@@ -1114,9 +1179,18 @@ function addCompRow(c={}){
       return `<option value="${i.id}" ${c.ingrediente_id===i.id?'selected':''}>${i.nombre}${i.formato?' — '+i.formato:''}</option>`;
     }).join('');
   } else {
-    const subelab=RECS.filter(r=>r.tipo==='elaboracion'&&r.activo!==false&&r.id!==eRec);
-    opts=subelab.map(r=>`<option value="${r.id}" ${c.sub_receta_id===r.id?'selected':''}>${r.nombre}</option>`).join('');
-    if(!opts) opts='<option disabled>— Sin sub-elaboraciones cargadas —</option>';
+    // Filtrar sub-elaboraciones por local del plato actual + las "todos" (transversales)
+    const localActual=document.getElementById('rLocal')?.value||'todos';
+    const subelab=RECS.filter(r=>{
+      if(r.tipo!=='elaboracion'||r.activo===false||r.id===eRec)return false;
+      // Mostrar siempre las transversales ("todos") y las del mismo local
+      return r.local==='todos'||r.local===localActual;
+    });
+    opts=subelab.map(r=>{
+      const tag=r.local&&r.local!=='todos'?` <small style="color:var(--gray)">[${r.local}]</small>`:'';
+      return `<option value="${r.id}" ${c.sub_receta_id===r.id?'selected':''}>${r.nombre}${r.local==='todos'?' (transversal)':''}</option>`;
+    }).join('');
+    if(!opts) opts='<option disabled>— Sin sub-elaboraciones para este local —</option>';
   }
   tr.dataset.tipo=tipo;
   const unidadVal=c.unidad||'';
@@ -1209,6 +1283,21 @@ function updPrev(){
   document.getElementById('pCosto').textContent=fmt(tot);
   document.getElementById('pRend').textContent=`${rend} ${und}`;
   document.getElementById('pUnit').textContent=fmt(tot/rend);
+  // FoodCost solo si es plato y tiene precio cargado
+  const tipo=document.getElementById('rTipo').value;
+  const hint=document.getElementById('rFcHint');
+  if(tipo==='plato'&&hint){
+    const precio=parseFloat(document.getElementById('rPrecio').value)||0;
+    const costoUnit=tot/rend;
+    if(precio>0&&costoUnit>0){
+      const fc=(costoUnit/precio*100);
+      const margen=precio-costoUnit;
+      const color=fc<=30?'var(--olive)':fc<=40?'#C68A0E':'var(--rust)';
+      hint.innerHTML=`<strong style="color:${color}">${fc.toFixed(1)}% FC</strong> · Margen bruto: <strong>${fmt(margen)}</strong>`;
+    }else{
+      hint.textContent='Cargá el costo y el precio para ver el foodcost';
+    }
+  }
 }
 window.updPrev=updPrev;
 
@@ -1216,6 +1305,7 @@ async function saveRec(){
   const nom=document.getElementById('rNombre').value.trim();if(!nom){toast('Ingresá un nombre');return;}
   const tipo=document.getElementById('rTipo').value;
   const ahora=new Date().toISOString();const data={nombre:nom,tipo,local:document.getElementById('rLocal').value,categoria:document.getElementById('rCat').value,rendimiento:parseFloat(document.getElementById('rRend').value)||1,tiempo_prep:document.getElementById('rTiempo').value,unidad_rendimiento:document.getElementById('rUnd').value,procedimiento:document.getElementById('rProc').value,activo:true,creado_por:CU.id,actualizado_por:CU.id,actualizado_en:ahora};
+  if(tipo==='plato'){data.precio_venta=parseFloat(document.getElementById('rPrecio').value)||0;}
   const comps=[];
   document.querySelectorAll('#compRows tr').forEach(tr=>{
     const t=tr.dataset.tipo;const ref=parseInt(tr.querySelector('.cr')?.value)||0;const qty=parseFloat(tr.querySelector('.cq')?.value)||0;
@@ -1265,10 +1355,17 @@ function rendMPasos(){
 
 function rendPlatDisp(){
   const s=(document.getElementById('mPlatoSearch')?.value||'').toLowerCase();
+  const localMenu=document.getElementById('mLocal')?.value||'';
   const ya=MPASOS.map(p=>p.receta_id);
-  const pl=RECS.filter(r=>r.tipo==='plato'&&(r.receta_componentes||[]).length>0&&(!s||r.nombre.toLowerCase().includes(s)));
+  const pl=RECS.filter(r=>{
+    if(r.tipo!=='plato'||(r.receta_componentes||[]).length===0)return false;
+    if(s&&!r.nombre.toLowerCase().includes(s))return false;
+    // Filtro por local: mismo local del menú o "todos" (transversal)
+    if(localMenu&&r.local!=='todos'&&r.local!==localMenu)return false;
+    return true;
+  });
   const c=document.getElementById('platDisp');
-  if(!pl.length){c.innerHTML='<div style="color:var(--gray);font-size:12px;padding:14px">No hay platos costeados disponibles.<br><small>Un plato debe tener al menos un componente para aparecer acá.</small></div>';return;}
+  if(!pl.length){c.innerHTML='<div style="color:var(--gray);font-size:12px;padding:14px">No hay platos costeados disponibles para este local.<br><small>Cargá un plato del mismo local o marcado como transversal.</small></div>';return;}
   c.innerHTML=pl.map(r=>{
     const ya2=ya.includes(r.id);
     return `<div class="po ${ya2?'added':''}" onclick="agrPaso(${r.id})"><div><div style="font-size:13px;font-weight:500">${r.nombre}</div><div style="font-size:11px;color:var(--gray)">${LL[r.local]||r.local} · ${r.categoria||''}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:var(--olive)">${fmt(costo(r))}</div><div style="font-size:10px;color:${ya2?'var(--gray)':'var(--olive)'}">${ya2?'ya agregado':'+ agregar'}</div></div></div>`;
