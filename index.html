@@ -867,8 +867,22 @@ async function loadElab(){await loadAll();renderElab();}
 async function loadPlatos(){await loadAll();renderPlatos();}
 async function loadMenus(){
   await loadAll();
-  const m=await api('recetas?select=*,menu_pasos!menu_pasos_menu_id_fkey(*,receta:receta_id(*,receta_componentes(*)))&tipo=eq.menu&activo=eq.true&order=nombre.asc');
-  MENUS=m||[];renderMenus();
+  // 1) Traer los menús (sin embeds para evitar problemas de relaciones ambiguas)
+  const menus=await api('recetas?select=*&tipo=eq.menu&activo=eq.true&order=nombre.asc')||[];
+  if(!menus.length){MENUS=[];renderMenus();return;}
+  // 2) Traer los pasos de TODOS los menús de una sola vez
+  const ids=menus.map(m=>m.id).join(',');
+  const pasos=await api(`menu_pasos?menu_id=in.(${ids})&select=*&order=orden.asc`)||[];
+  // 3) Cruzar en memoria: cada paso obtiene su `receta` desde RECS (que ya tiene componentes)
+  const recsMap={};RECS.forEach(r=>{recsMap[r.id]=r;});
+  const pasosPorMenu={};
+  pasos.forEach(p=>{
+    if(!pasosPorMenu[p.menu_id])pasosPorMenu[p.menu_id]=[];
+    pasosPorMenu[p.menu_id].push({...p,receta:recsMap[p.receta_id]||null});
+  });
+  // 4) Asignar pasos a cada menú
+  MENUS=menus.map(m=>({...m,menu_pasos:pasosPorMenu[m.id]||[]}));
+  renderMenus();
 }
 let ingPage=0;const ING_PAGE=50;let ingDebounce=null;
 
