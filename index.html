@@ -889,6 +889,10 @@ let ingPage=0;const ING_PAGE=50;let ingDebounce=null;
 async function loadIng(){
   await cargarFamilias();
   await cargarFamiliasMap();
+  // El buscador arranca siempre vacío al abrir la sección
+  const fSearch=document.getElementById('ingSearch'); if(fSearch) fSearch.value='';
+  const fSubfam=document.getElementById('ingSubfam'); if(fSubfam) fSubfam.value='';
+  const fVal=document.getElementById('ingVal'); if(fVal) fVal.value='';
   ingPage=0;
   await buscarIng();
 }
@@ -936,7 +940,8 @@ async function buscarIng(){
   const [data, count] = await Promise.all([api(q), apiCount(qCount)]);
   const ings=data||[];
   const total=count||0;
-  INGS=ings;
+  // OJO: no pisar INGS (lista maestra usada al armar recetas). La tabla de
+  // Ingredientes & Costos trabaja solo con esta lista filtrada temporal.
   document.getElementById('ingCount').textContent=`${total.toLocaleString('es-AR')} ingredientes`;
   renderIngData(ings);
   renderIngPager(total);
