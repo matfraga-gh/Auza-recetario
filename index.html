@@ -196,6 +196,197 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   .stats{grid-template-columns:1fr 1fr}
   .stat .val{font-size:20px}
 }
+
+/* ============================================
+   MÓDULO REQUERIMIENTOS - Mobile first
+   ============================================ */
+.req-tabs{display:flex;gap:6px;margin-bottom:14px;background:var(--sand-l);padding:4px;border-radius:10px}
+.req-tab{flex:1;padding:9px 8px;text-align:center;font-size:13px;font-weight:500;color:var(--gray);border:none;background:transparent;border-radius:7px;cursor:pointer;font-family:inherit}
+.req-tab.active{background:var(--white);color:var(--dark);box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.req-tab .ct{font-size:11px;background:var(--sand);color:var(--dark);padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600}
+.req-tab.active .ct{background:var(--olive);color:var(--white)}
+
+.req-filter{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.req-filter select{flex:1;min-width:140px;padding:9px 12px;border:1.5px solid var(--sand);border-radius:8px;background:var(--white);font-size:13px;font-family:inherit;color:var(--dark)}
+
+.req-list{display:flex;flex-direction:column;gap:10px}
+.req-card{background:var(--white);border:1px solid var(--sand-l);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.req-card:hover{border-color:var(--olive-l);box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.req-card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.req-card-id{font-size:15px;font-weight:600;color:var(--dark)}
+.req-card-meta{font-size:12px;color:var(--gray);margin-bottom:8px;line-height:1.5}
+.req-card-meta strong{color:var(--dark);font-weight:600}
+.req-card-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--gray);padding-top:8px;border-top:1px dashed var(--sand-l)}
+
+.req-badge{display:inline-block;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;padding:3px 9px;border-radius:6px}
+.req-b-pend{background:#FFF3E0;color:#E65100}
+.req-b-comp{background:#E8F5E9;color:#2E7D32}
+.req-b-canc{background:#F5F5F5;color:#757575;text-decoration:line-through}
+.req-b-recv{background:#E3F2FD;color:#1565C0}
+
+/* ===== Paleta unificada de estados de pedido ===== */
+/* Cada estado tiene un color para el borde-izquierdo de la card y un badge */
+.req-card{position:relative;border-left:4px solid var(--sand);padding-left:12px}
+.req-card.st-vencido{border-left-color:#C0392B}
+.req-card.st-hoy{border-left-color:#C4622D}
+.req-card.st-parcial{border-left-color:#2980B9}
+.req-card.st-pend{border-left-color:#D4C4A0}
+.req-card.st-comp{border-left-color:#27AE60}
+.req-card.st-compobs{border-left-color:#F39C12}
+.req-card.st-canc{border-left-color:#8A8278;opacity:0.7}
+
+/* Badges por estado */
+.req-b-vencido{background:#FFEBEE;color:#C0392B}
+.req-b-hoy{background:#FFF3E0;color:#E65100}
+.req-b-parcial{background:#E3F2FD;color:#1565C0}
+.req-b-pendnorm{background:#F5F0E8;color:#5F5E5A}
+.req-b-completo{background:#E8F5E9;color:#2E7D32}
+.req-b-completoobs{background:#FFF8E1;color:#B7791F}
+.req-b-cancelado{background:#F5F5F5;color:#757575}
+
+.req-empty{text-align:center;padding:48px 20px;color:var(--gray);background:var(--white);border-radius:12px;border:2px dashed var(--sand-l)}
+.req-empty-icon{font-size:48px;margin-bottom:12px;opacity:0.5}
+.req-empty-txt{font-size:14px;margin-bottom:4px}
+.req-empty-sub{font-size:12px;color:var(--gray)}
+
+/* Detalle requerimiento */
+.req-detail{background:var(--white);border:1px solid var(--sand-l);border-radius:12px;padding:14px;margin-bottom:16px}
+.req-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.req-field{display:flex;flex-direction:column}
+.req-field label{font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--gray);margin-bottom:4px}
+.req-field input,.req-field select,.req-field textarea{padding:8px 10px;border:1.5px solid var(--sand);border-radius:8px;background:var(--white);font-size:13px;font-family:inherit;color:var(--dark);outline:none}
+.req-field input:focus,.req-field select:focus,.req-field textarea:focus{border-color:var(--olive)}
+.req-field .ro{background:var(--sand-l);color:var(--gray);border-style:dashed}
+.req-field textarea{resize:vertical;min-height:60px}
+
+/* Items del requerimiento - VERSION COMPACTA */
+.req-items{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.req-item{background:var(--white);border:1px solid var(--sand-l);border-radius:8px;padding:8px 10px}
+.req-item-row1{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.req-item-info{flex:1;min-width:0}
+.req-item-nom{font-size:13px;font-weight:600;color:var(--dark);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-item-desc{font-size:10px;color:var(--gray);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.req-item-input{display:flex;flex-direction:column;align-items:center;gap:1px}
+.req-item-input input{width:48px;padding:5px 6px;font-size:12px;border:1px solid var(--sand);border-radius:6px;text-align:right;outline:none;font-family:inherit;color:var(--dark);background:var(--white)}
+.req-item-input input:focus{border-color:var(--olive)}
+.req-item-input.stk input{background:var(--cream)}
+.req-item-input .lab{font-size:9px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;color:var(--gray);line-height:1}
+.req-item-input .unit{font-size:9px;color:var(--gray);line-height:1;margin-top:1px}
+.req-item-acts{display:flex;align-items:center;gap:4px;align-self:flex-start;margin-top:2px}
+.req-item-com-btn{background:transparent;border:none;cursor:pointer;padding:3px;font-size:14px;line-height:1;color:var(--gray)}
+.req-item-com-btn.active{color:var(--blue)}
+.req-item-del{background:transparent;border:none;color:var(--gray);font-size:13px;cursor:pointer;padding:3px;line-height:1}
+.req-item-del:hover{color:var(--red)}
+
+/* Chips de destinos - fila inferior compacta */
+.req-item-chips{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.req-chip-mini{font-size:10px;padding:2px 7px;border-radius:9px;border:1px solid var(--sand);background:var(--white);color:var(--gray);cursor:pointer;font-family:inherit;font-weight:500;user-select:none;line-height:1.3}
+.req-chip-mini:hover{border-color:var(--olive-l)}
+.req-chip-mini.sel{background:var(--olive);border-color:var(--olive);color:var(--white)}
+.req-chip-mini.add{border-style:dashed;color:var(--gray);padding:2px 6px}
+.req-chip-mini.disabled{opacity:0.4;cursor:not-allowed}
+
+/* Selector inline de destinos (popover) */
+.req-dest-pop{display:none;flex-wrap:wrap;gap:3px;padding:6px;background:var(--sand-l);border-radius:6px;margin-top:4px}
+.req-dest-pop.open{display:flex}
+
+/* Input de comentario expandible */
+.req-com-row{display:none;margin-top:5px}
+.req-com-row.open{display:block}
+.req-com-row input{width:100%;padding:6px 8px;border:1px solid var(--sand-l);border-radius:6px;font-size:11px;font-family:inherit;color:var(--dark);outline:none;background:var(--cream)}
+.req-com-row input:focus{border-color:var(--olive);background:var(--white)}
+
+/* Costos histórico vs actual */
+.req-costo{display:flex;gap:6px;font-size:10px;color:var(--gray);margin-top:5px;padding-top:5px;border-top:1px dashed var(--sand-l);flex-wrap:wrap}
+.req-costo .now{color:var(--olive);font-weight:600}
+.req-costo .diff-up{color:var(--red);font-weight:600}
+.req-costo .diff-dn{color:var(--green);font-weight:600}
+
+/* Botón agregar ingrediente */
+.req-add{width:100%;padding:12px;background:transparent;color:var(--olive);border:1.5px dashed var(--olive-l);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+.req-add:hover{background:var(--sand-l)}
+
+/* Modal seleccionar ingrediente */
+.req-ing-search{width:100%;padding:11px 14px;border:1.5px solid var(--sand);border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;outline:none}
+.req-ing-search:focus{border-color:var(--olive)}
+.req-ing-list{max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.req-ing-opt{padding:11px 12px;background:var(--cream);border-radius:8px;cursor:pointer;border:1.5px solid transparent}
+.req-ing-opt:hover{background:var(--sand-l);border-color:var(--olive-l)}
+.req-ing-opt .nom{font-size:14px;font-weight:600;color:var(--dark)}
+.req-ing-opt .det{font-size:11px;color:var(--gray);margin-top:2px}
+.req-ing-empty{text-align:center;padding:24px;color:var(--gray);font-size:13px}
+
+/* Acciones del requerimiento */
+.req-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.req-acciones .btn{flex:1;min-width:120px}
+
+/* Mobile-specific tweaks */
+@media (max-width:560px){
+  .req-card{padding:12px}
+  .req-detail{padding:12px}
+  .req-detail-grid{grid-template-columns:1fr}
+  .req-acciones{flex-direction:column}
+  .req-acciones .btn{width:100%}
+  .req-item-input input{width:42px;font-size:11px}
+  .req-item-nom{font-size:12px}
+}
+
+/* ===== Pestañas del módulo Requerimientos ===== */
+.req-modtabs{display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid var(--sand-l);overflow-x:auto;scrollbar-width:none}
+.req-modtabs::-webkit-scrollbar{display:none}
+.req-modtab{padding:10px 14px;font-size:13px;font-weight:500;color:var(--gray);background:transparent;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;font-family:inherit;display:flex;align-items:center;gap:6px}
+.req-modtab:hover{color:var(--dark)}
+.req-modtab.active{color:var(--dark);border-bottom-color:var(--olive)}
+.req-modtab .badge-soon{font-size:9px;background:var(--sand);color:var(--gray);padding:1px 5px;border-radius:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+
+/* Sub-secciones del módulo */
+.req-pane{display:none}
+.req-pane.active{display:block}
+
+/* ===== Pantalla de Recepción Guiada ===== */
+.rec-hdr{background:var(--white);border:1px solid var(--sand-l);border-radius:10px;padding:14px;margin-bottom:14px}
+.rec-hdr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.rec-hdr-id{font-size:16px;font-weight:600}
+.rec-hdr-meta{font-size:12px;color:var(--gray);line-height:1.5}
+.rec-hdr-meta strong{color:var(--dark);font-weight:600}
+.rec-progress{margin-top:10px;height:6px;background:var(--sand-l);border-radius:3px;overflow:hidden}
+.rec-progress-bar{height:100%;background:var(--olive);transition:width .3s}
+.rec-progress-txt{font-size:11px;color:var(--gray);margin-top:6px;text-align:center}
+
+.rec-items{display:flex;flex-direction:column;gap:6px}
+.rec-item{background:var(--white);border:1px solid var(--sand-l);border-radius:8px;padding:8px 10px;transition:border-color .15s}
+.rec-item.done{opacity:0.6;border-color:var(--sand-l)}
+.rec-item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.rec-item-nom{font-size:13px;font-weight:600;color:var(--dark);line-height:1.25}
+.rec-item-desc{font-size:10px;color:var(--gray);margin-top:1px;line-height:1.2}
+.rec-item-cant{font-size:11px;color:var(--gray);margin-top:3px}
+.rec-item-cant strong{color:var(--dark);font-weight:600;font-size:13px}
+
+.rec-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.rec-btn{padding:6px 4px;border:1.5px solid var(--sand);background:var(--white);border-radius:6px;cursor:pointer;font-family:inherit;font-size:10px;font-weight:600;color:var(--gray);display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1;transition:all .15s}
+.rec-btn:hover{border-color:var(--olive-l)}
+.rec-btn .ic{font-size:14px;line-height:1}
+.rec-btn.sel{background:var(--olive);border-color:var(--olive);color:var(--white)}
+.rec-btn.correcto.sel{background:#27AE60;border-color:#27AE60}
+.rec-btn.modificado.sel{background:#F39C12;border-color:#F39C12}
+.rec-btn.incompleto.sel{background:#E67E22;border-color:#E67E22}
+.rec-btn.pendiente.sel{background:#95A5A6;border-color:#95A5A6}
+
+.rec-comentario{margin-top:6px;display:none}
+.rec-comentario.open{display:block}
+.rec-comentario input{width:100%;padding:6px 8px;border:1px solid var(--sand);border-radius:6px;font-size:11px;font-family:inherit;outline:none;background:var(--cream);color:var(--dark)}
+.rec-comentario input:focus{border-color:var(--olive);background:var(--white)}
+.rec-comentario .lab{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray);margin-bottom:3px}
+
+/* Badge de fecha vencida */
+.rec-vencido{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:#FFEBEE;color:var(--red);padding:2px 6px;border-radius:5px;margin-left:6px}
+.rec-hoy{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:#FFF3E0;color:#E65100;padding:2px 6px;border-radius:5px;margin-left:6px}
+
+/* Placeholders "próximamente" */
+.req-soon{text-align:center;padding:60px 20px;color:var(--gray)}
+.req-soon-icon{font-size:64px;margin-bottom:16px;opacity:0.4}
+.req-soon-tit{font-size:16px;font-weight:600;color:var(--dark);margin-bottom:6px}
+.req-soon-txt{font-size:13px;line-height:1.5;max-width:380px;margin:0 auto}
 </style>
 </head>
 <body>
@@ -410,6 +601,158 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         <tbody id="localesTbody"></tbody>
       </table></div>
     </div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: REQUERIMIENTOS DE MERCADERÍA
+     ============================================ -->
+<div id="vReq" class="view">
+  <div class="app-hdr">
+    <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Requerimientos</div></div>
+    <div class="app-btns">
+      <button class="abtn ao" onclick="openReqNuevo()">+ Nuevo pedido</button>
+      <button class="abtn ab" onclick="showView('vDash')">← Dashboard</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="ptitle">Requerimientos de mercadería</div>
+    <div class="psub" id="reqSubtitle">Pedidos de ingredientes y su seguimiento</div>
+
+    <!-- Pestañas del módulo -->
+    <div class="req-modtabs">
+      <button class="req-modtab active" data-pane="req-pedidos" onclick="switchReqPane('req-pedidos')">📋 Requerimientos</button>
+      <button class="req-modtab" data-pane="req-recepciones" onclick="switchReqPane('req-recepciones')">📥 Recepciones <span id="recBadgeCount" style="font-size:10px;background:var(--rust);color:var(--white);padding:1px 6px;border-radius:8px;font-weight:600"></span></button>
+      <button class="req-modtab" data-pane="req-insumos" onclick="switchReqPane('req-insumos')">🧂 Insumos <span class="badge-soon">Pronto</span></button>
+      <button class="req-modtab" data-pane="req-stats" onclick="switchReqPane('req-stats')">📊 Estadísticas <span class="badge-soon">Pronto</span></button>
+    </div>
+
+    <!-- ====== Pane: Pedidos ====== -->
+    <div class="req-pane active" id="req-pedidos">
+      <!-- Filtro de local (solo Compras/Admin) -->
+      <div class="req-filter" id="reqFilterRow" style="display:none">
+        <select id="reqFiltroLocal" onchange="renderReq()">
+          <option value="">Todos los locales</option>
+        </select>
+      </div>
+
+      <!-- Tabs: Pendientes / Completados / Cancelados -->
+      <div class="req-tabs">
+        <button class="req-tab active" data-tab="pendiente" onclick="switchReqTab('pendiente')">Pendientes <span class="ct" id="reqCntPend">0</span></button>
+        <button class="req-tab" data-tab="completado" onclick="switchReqTab('completado')">Completados <span class="ct" id="reqCntComp">0</span></button>
+        <button class="req-tab" data-tab="cancelado" onclick="switchReqTab('cancelado')">Cancelados <span class="ct" id="reqCntCanc">0</span></button>
+      </div>
+
+      <div class="req-list" id="reqList"></div>
+    </div>
+
+    <!-- ====== Pane: Recepciones ====== -->
+    <div class="req-pane" id="req-recepciones">
+      <div class="psub" style="margin-top:0">Pendientes de recibir (vencidos primero) y histórico de los últimos 30 días.</div>
+      <div class="req-list" id="recList"></div>
+    </div>
+
+    <!-- ====== Pane: Insumos (placeholder) ====== -->
+    <div class="req-pane" id="req-insumos">
+      <div class="req-soon">
+        <div class="req-soon-icon">🧂</div>
+        <div class="req-soon-tit">Listado de insumos</div>
+        <div class="req-soon-txt">Acá vas a poder consultar todos los ingredientes (validados y pendientes) sin salir de Requerimientos. <br><br><em>Próximamente en la Etapa 4.</em></div>
+      </div>
+    </div>
+
+    <!-- ====== Pane: Estadísticas (placeholder) ====== -->
+    <div class="req-pane" id="req-stats">
+      <div class="req-soon">
+        <div class="req-soon-icon">📊</div>
+        <div class="req-soon-tit">Estadísticas y reportes</div>
+        <div class="req-soon-txt">Acá vas a ver consumo por local, variaciones de costo, destinos más usados y otras métricas para tomar decisiones. <br><br><em>Próximamente en la Etapa 5.</em></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Recepción guiada de un pedido -->
+<div class="overlay" id="ovRec">
+  <div class="modal wide">
+    <button class="mc" onclick="closeOv('ovRec')">✕</button>
+    <h2 id="recTitulo">Recibiendo pedido</h2>
+
+    <div class="rec-hdr" id="recHdr"></div>
+
+    <div class="rec-items" id="recItems"></div>
+
+    <div class="req-acciones" style="margin-top:16px">
+      <button class="btn bp" onclick="guardarRecepcion()">💾 Guardar recepción</button>
+      <button class="btn bs" onclick="closeOv('ovRec')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detalle / Edición de un requerimiento -->
+<div class="overlay" id="ovReq">
+  <div class="modal wide">
+    <button class="mc" onclick="closeOv('ovReq')">✕</button>
+    <h2 id="reqDetTitulo">Nuevo requerimiento</h2>
+
+    <!-- Cabecera -->
+    <div class="req-detail">
+      <div class="req-detail-grid">
+        <div class="req-field">
+          <label>Local</label>
+          <select id="reqDetLocal">
+            <option value="azafran">Azafrán</option>
+            <option value="trapiche">Espacio Trapiche</option>
+            <option value="nieto">Nieto Senetiner</option>
+            <option value="vinobien">Vinobien</option>
+            <option value="cobos">Viña Cobos</option>
+          </select>
+        </div>
+        <div class="req-field">
+          <label>Estado</label>
+          <input type="text" id="reqDetEstado" class="ro" readonly value="Pendiente">
+        </div>
+        <div class="req-field">
+          <label>Fecha de pedido (Cocina)</label>
+          <input type="date" id="reqDetFechaDeseada">
+        </div>
+        <div class="req-field">
+          <label>Fecha estimada de entrega (Compras)</label>
+          <input type="date" id="reqDetFechaComp">
+        </div>
+      </div>
+      <div class="req-field">
+        <label>Observaciones generales</label>
+        <textarea id="reqDetObs" placeholder="Notas para Compras (opcional)"></textarea>
+      </div>
+    </div>
+
+    <!-- Items -->
+    <div style="font-size:13px;font-weight:600;color:var(--dark);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+      <span>Ingredientes del pedido <span id="reqItemsCount" style="color:var(--gray);font-weight:500"></span></span>
+    </div>
+    <div class="req-items" id="reqItems"></div>
+
+    <button class="req-add" onclick="abrirSelectorIngrediente()">+ Agregar ingrediente</button>
+
+    <!-- Acciones -->
+    <div class="req-acciones">
+      <button class="btn bp" onclick="guardarReq()" id="reqBtnGuardar">💾 Guardar</button>
+      <button class="btn bs" onclick="closeOv('ovReq')">Cancelar</button>
+      <button class="btn bd" onclick="cancelarReq()" id="reqBtnCancelar" style="display:none">🚫 Cancelar pedido</button>
+      <button class="btn bd" onclick="eliminarReq()" id="reqBtnEliminar" style="display:none">🗑 Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Selector de ingredientes -->
+<div class="overlay" id="ovReqIng">
+  <div class="modal">
+    <button class="mc" onclick="closeOv('ovReqIng')">✕</button>
+    <h2>Agregar ingrediente</h2>
+    <div class="psub" style="margin-bottom:14px">Solo se muestran ingredientes validados por Compras.</div>
+    <input type="text" id="reqIngBuscar" class="req-ing-search" placeholder="Buscar por nombre, formato o proveedor..." oninput="filtrarSelectorIng()">
+    <div class="req-ing-list" id="reqIngList"></div>
   </div>
 </div>
 
@@ -738,7 +1081,7 @@ function showView(id){
   }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if(id==='vElab')loadElab();else if(id==='vPlatos')loadPlatos();else if(id==='vMenus')loadMenus();else if(id==='vIng')loadIng();else if(id==='vUsers'){loadUsers();switchAdminTab('usuarios');}
+  if(id==='vElab')loadElab();else if(id==='vPlatos')loadPlatos();else if(id==='vMenus')loadMenus();else if(id==='vIng')loadIng();else if(id==='vUsers'){loadUsers();switchAdminTab('usuarios');}else if(id==='vReq')loadReq();
 }
 window.showView=showView;
 function openOv(id){document.getElementById(id).classList.add('open');}
@@ -795,6 +1138,7 @@ function buildDash(){
     {i:'🧪',t:'Sub-elaboraciones',d:'Preparaciones internas y bases',a:"showView('vElab')"},
     {i:'🍽',t:'Platos & Pasos',d:'Platos costeados',a:"showView('vPlatos')"},
     {i:'📋',t:'Menús',d:'Armado y costeo de menús',a:"showView('vMenus')"},
+    {i:'📦',t:'Requerimientos',d:'Pedidos de mercadería',a:"showView('vReq')"},
   ];
   if(CU.rol==='compras'||CU.rol==='admin'){
     cards.push({i:'🧂',t:'Ingredientes',d:'Precios y proveedores',badge:'Compras',bc:'boli',a:"showView('vIng')"});
@@ -889,10 +1233,6 @@ let ingPage=0;const ING_PAGE=50;let ingDebounce=null;
 async function loadIng(){
   await cargarFamilias();
   await cargarFamiliasMap();
-  // El buscador arranca siempre vacío al abrir la sección
-  const fSearch=document.getElementById('ingSearch'); if(fSearch) fSearch.value='';
-  const fSubfam=document.getElementById('ingSubfam'); if(fSubfam) fSubfam.value='';
-  const fVal=document.getElementById('ingVal'); if(fVal) fVal.value='';
   ingPage=0;
   await buscarIng();
 }
@@ -940,8 +1280,7 @@ async function buscarIng(){
   const [data, count] = await Promise.all([api(q), apiCount(qCount)]);
   const ings=data||[];
   const total=count||0;
-  // OJO: no pisar INGS (lista maestra usada al armar recetas). La tabla de
-  // Ingredientes & Costos trabaja solo con esta lista filtrada temporal.
+  INGS=ings;
   document.getElementById('ingCount').textContent=`${total.toLocaleString('es-AR')} ingredientes`;
   renderIngData(ings);
   renderIngPager(total);
@@ -1778,6 +2117,870 @@ async function diagIngredientes(){
   box.textContent=txt;
 }
 window.diagIngredientes=diagIngredientes;
+
+// ============================================================================
+// MÓDULO REQUERIMIENTOS DE MERCADERÍA
+// ============================================================================
+// Estado del módulo (variables propias para no chocar con otras)
+let REQS=[];           // listado de requerimientos cargados
+let REQ_TAB='pendiente'; // tab activa: pendiente / completado / cancelado
+let REQ_ED=null;       // requerimiento en edición (id o null si es nuevo)
+let REQ_ITEMS_DRAFT=[]; // items en edición (en memoria, antes de guardar)
+const REQ_DESTINOS=[
+  {slug:'menu',nom:'Menú'},
+  {slug:'prueba',nom:'Prueba'},
+  {slug:'evento',nom:'Evento'},
+  {slug:'com_perso',nom:'Com Perso'},
+  {slug:'uso_interno',nom:'Uso Interno'},
+  {slug:'otro',nom:'Otro'}
+];
+
+// ---------- Permisos ----------
+function reqEsAdmin(){return CU&&CU.rol==='admin';}
+function reqEsCompras(){return CU&&(CU.rol==='compras'||CU.rol==='admin');}
+// "Local del usuario": si tiene un local específico, lo devuelve. Si es admin o compras, null (ve todos).
+function reqLocalDelUsuario(){
+  if(!CU)return null;
+  if(reqEsCompras())return null; // ve todos
+  return CU.local||null;
+}
+
+// ---------- Carga inicial de la vista ----------
+async function loadReq(){
+  // CRÍTICO: aseguramos que INGS esté cargada (si entran directo a Requerimientos
+  // sin pasar por Recetas/Platos, la lista global está vacía y los items mostrarían "(ingrediente)")
+  await loadAll();
+
+  // Mostrar/ocultar filtro de local (solo Compras/Admin)
+  const filterRow=document.getElementById('reqFilterRow');
+  if(reqEsCompras()){
+    filterRow.style.display='flex';
+    // Poblar selector de locales si está vacío
+    const sel=document.getElementById('reqFiltroLocal');
+    if(sel.options.length<=1){
+      sel.innerHTML='<option value="">Todos los locales</option>'+
+        '<option value="azafran">Azafrán</option>'+
+        '<option value="trapiche">Espacio Trapiche</option>'+
+        '<option value="nieto">Nieto Senetiner</option>'+
+        '<option value="vinobien">Vinobien</option>'+
+        '<option value="cobos">Viña Cobos</option>';
+    }
+  } else {
+    filterRow.style.display='none';
+  }
+
+  // Subtítulo descriptivo según rol
+  const sub=document.getElementById('reqSubtitle');
+  if(reqEsAdmin()) sub.textContent='Pedidos de ingredientes y su seguimiento. Como Admin podés ver y editar todos.';
+  else if(reqEsCompras()) sub.textContent='Pedidos de ingredientes. Como Compras revisás y comprometés fechas.';
+  else sub.textContent=`Pedidos de ingredientes para tu local. Creá y editá los pedidos pendientes.`;
+
+  await fetchReqs();
+  renderReq();
+}
+
+// ---------- Trae los requerimientos desde Supabase ----------
+async function fetchReqs(){
+  let q='requerimientos?select=*,requerimiento_items(*)&activo=eq.true&order=fecha_creacion.desc';
+  const localUsuario=reqLocalDelUsuario();
+  if(localUsuario){
+    // Cocina/local: solo los suyos
+    q+=`&local=eq.${encodeURIComponent(localUsuario)}`;
+  }
+  const data=await api(q);
+  REQS=data||[];
+}
+
+// ---------- Render del listado ----------
+function renderReq(){
+  // Filtro por local (selector de Compras/Admin)
+  const filtroLocal=document.getElementById('reqFiltroLocal')?.value||'';
+  let lista=REQS;
+  if(filtroLocal) lista=lista.filter(r=>r.local===filtroLocal);
+
+  // Contadores por estado
+  const pend=lista.filter(r=>r.estado==='pendiente').length;
+  const comp=lista.filter(r=>r.estado==='completado').length;
+  const canc=lista.filter(r=>r.estado==='cancelado').length;
+  document.getElementById('reqCntPend').textContent=pend;
+  document.getElementById('reqCntComp').textContent=comp;
+  document.getElementById('reqCntCanc').textContent=canc;
+
+  // Filtrar por tab activa
+  const visibles=lista.filter(r=>r.estado===REQ_TAB);
+
+  const cont=document.getElementById('reqList');
+  if(!visibles.length){
+    cont.innerHTML=`<div class="req-empty">
+      <div class="req-empty-icon">📦</div>
+      <div class="req-empty-txt">No hay requerimientos ${REQ_TAB==='pendiente'?'pendientes':REQ_TAB+'s'}</div>
+      <div class="req-empty-sub">${REQ_TAB==='pendiente'?'Hacé click en "+ Nuevo pedido" para crear uno':''}</div>
+    </div>`;
+    return;
+  }
+
+  cont.innerHTML=visibles.map(r=>{
+    const items=r.requerimiento_items||[];
+    const recibidos=items.filter(it=>it.estado_recepcion&&it.estado_recepcion!=='pendiente').length;
+    const fCre=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}):'—';
+    const fDes=r.fecha_deseada?new Date(r.fecha_deseada+'T00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}):null;
+    const fCom=r.fecha_comprometida?new Date(r.fecha_comprometida+'T00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}):null;
+    const localNom=reqNomLocal(r.local);
+    const est=estadoPedido(r);
+    const badge=`<span class="req-badge ${est.claseBadge}">${est.icon?est.icon+' ':''}${est.label}</span>`;
+    return `<div class="req-card ${est.claseCard}" onclick="abrirReq(${r.id})">
+      <div class="req-card-hdr">
+        <span class="req-card-id">Pedido #${r.id}</span>
+        ${badge}
+      </div>
+      <div class="req-card-meta">
+        <strong>${localNom}</strong> · Creado ${fCre}
+        ${fDes?`<br>📅 F. de pedido: ${fDes}`:''}
+        ${fCom?` · F. est. entrega: ${fCom}`:''}
+      </div>
+      <div class="req-card-foot">
+        <span>${items.length} ingrediente${items.length===1?'':'s'} · ${recibidos} recibido${recibidos===1?'':'s'}</span>
+        <span style="font-size:14px">›</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function reqNomLocal(slug){
+  const m={azafran:'Azafrán',trapiche:'Espacio Trapiche',nieto:'Nieto Senetiner',vinobien:'Vinobien',cobos:'Viña Cobos'};
+  return m[slug]||slug||'—';
+}
+
+// Devuelve el "estado visual" del pedido (incluye derivados como vencido / hoy / parcial / con observaciones)
+// Retorna un objeto: { slug, label, icon, claseCard, claseBadge }
+function estadoPedido(r){
+  if(r.estado==='cancelado'){
+    return {slug:'canc',label:'Cancelado',icon:'',claseCard:'st-canc',claseBadge:'req-b-cancelado'};
+  }
+  if(r.estado==='completado'){
+    // Distinguir completado limpio vs completado con observaciones
+    const items=r.requerimiento_items||[];
+    const conObs=items.some(it=>it.estado_recepcion==='modificado'||it.estado_recepcion==='incompleto');
+    if(conObs){
+      return {slug:'compobs',label:'Completado con obs.',icon:'⚠',claseCard:'st-compobs',claseBadge:'req-b-completoobs'};
+    }
+    return {slug:'comp',label:'Completado',icon:'✓',claseCard:'st-comp',claseBadge:'req-b-completo'};
+  }
+  // Es pendiente: distinguir vencido / hoy / parcial / pendiente normal
+  const items=r.requerimiento_items||[];
+  const recibidos=items.filter(it=>it.estado_recepcion&&it.estado_recepcion!=='pendiente').length;
+
+  // Si ya hay items recibidos pero no todos → entrega parcial
+  if(recibidos>0){
+    return {slug:'parcial',label:'Entrega parcial',icon:'◐',claseCard:'st-parcial',claseBadge:'req-b-parcial'};
+  }
+
+  // Sin recibir: chequear fechas
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const tsHoy=hoy.getTime();
+  const fechaRef=r.fecha_comprometida||r.fecha_deseada;
+  if(fechaRef){
+    const ts=new Date(fechaRef+'T00:00').getTime();
+    if(ts<tsHoy) return {slug:'vencido',label:'Vencido',icon:'⚠',claseCard:'st-vencido',claseBadge:'req-b-vencido'};
+    if(ts===tsHoy) return {slug:'hoy',label:'Hoy',icon:'⏰',claseCard:'st-hoy',claseBadge:'req-b-hoy'};
+  }
+  return {slug:'pend',label:'Pendiente',icon:'',claseCard:'st-pend',claseBadge:'req-b-pendnorm'};
+}
+
+function switchReqTab(tab){
+  REQ_TAB=tab;
+  document.querySelectorAll('.req-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  renderReq();
+}
+window.switchReqTab=switchReqTab;
+window.renderReq=renderReq;
+
+// ---------- Abrir modal: nuevo o existente ----------
+function openReqNuevo(){
+  REQ_ED=null;
+  REQ_ITEMS_DRAFT=[];
+  document.getElementById('reqDetTitulo').textContent='Nuevo requerimiento';
+  document.getElementById('reqDetEstado').value='Pendiente';
+  document.getElementById('reqDetObs').value='';
+  document.getElementById('reqDetFechaDeseada').value='';
+  document.getElementById('reqDetFechaComp').value='';
+
+  // Local por defecto: el del usuario si tiene, sino el primero
+  const localUsuario=CU.local;
+  const selLocal=document.getElementById('reqDetLocal');
+  if(localUsuario&&['azafran','trapiche','nieto','vinobien','cobos'].includes(localUsuario)){
+    selLocal.value=localUsuario;
+  }
+  // Cocina no puede cambiar el local del pedido (solo crea para el suyo)
+  selLocal.disabled=!reqEsCompras();
+
+  // Compras no puede tocar la fecha deseada al crear (la pone Cocina); pero como es nuevo, la deja editar igual
+  // Acciones disponibles
+  document.getElementById('reqBtnGuardar').style.display='';
+  document.getElementById('reqBtnCancelar').style.display='none';
+  document.getElementById('reqBtnEliminar').style.display='none';
+
+  renderItemsEdit();
+  openOv('ovReq');
+}
+window.openReqNuevo=openReqNuevo;
+
+async function abrirReq(id){
+  const r=REQS.find(x=>x.id===id);
+  if(!r){toast('Requerimiento no encontrado');return;}
+  REQ_ED=id;
+  REQ_ITEMS_DRAFT=(r.requerimiento_items||[]).map(it=>({
+    id:it.id,
+    ingrediente_id:it.ingrediente_id,
+    cantidad_pedida:it.cantidad_pedida,
+    unidad:it.unidad,
+    stock_actual:it.stock_actual,
+    destinos:Array.isArray(it.destinos)?it.destinos.slice():[],
+    comentario_pedido:it.comentario_pedido||'',
+    costo_unitario_pedido:it.costo_unitario_pedido,
+    estado_recepcion:it.estado_recepcion||'pendiente',
+    cantidad_recibida:it.cantidad_recibida,
+    comentario_recepcion:it.comentario_recepcion||''
+  }));
+
+  document.getElementById('reqDetTitulo').textContent=`Pedido #${r.id}`;
+  document.getElementById('reqDetEstado').value=({pendiente:'Pendiente',completado:'Completado',cancelado:'Cancelado'})[r.estado]||r.estado;
+  document.getElementById('reqDetLocal').value=r.local||'azafran';
+  document.getElementById('reqDetFechaDeseada').value=r.fecha_deseada||'';
+  document.getElementById('reqDetFechaComp').value=r.fecha_comprometida||'';
+  document.getElementById('reqDetObs').value=r.observaciones_generales||'';
+
+  // Permisos según rol y estado
+  const editable=(r.estado==='pendiente'||r.estado==='completado'&&reqEsAdmin());
+  const esMiLocal=reqEsCompras()||(CU.local===r.local);
+  const puedeEditar=esMiLocal&&editable&&r.estado!=='cancelado';
+
+  // Cocina: no puede cambiar local, no puede tocar fecha comprometida
+  document.getElementById('reqDetLocal').disabled=!reqEsCompras()||!puedeEditar;
+  document.getElementById('reqDetFechaDeseada').disabled=!puedeEditar;
+  document.getElementById('reqDetFechaComp').disabled=!reqEsCompras()||!puedeEditar;
+  document.getElementById('reqDetObs').disabled=!puedeEditar;
+
+  document.getElementById('reqBtnGuardar').style.display=puedeEditar?'':'none';
+  document.getElementById('reqBtnCancelar').style.display=(puedeEditar&&r.estado==='pendiente')?'':'none';
+  document.getElementById('reqBtnEliminar').style.display=reqEsAdmin()?'':'none';
+
+  renderItemsEdit(!puedeEditar);
+  openOv('ovReq');
+}
+window.abrirReq=abrirReq;
+
+// ---------- Render de items en edición (versión compacta) ----------
+function renderItemsEdit(readonly=false){
+  const cont=document.getElementById('reqItems');
+  document.getElementById('reqItemsCount').textContent=REQ_ITEMS_DRAFT.length?`(${REQ_ITEMS_DRAFT.length})`:'';
+  document.querySelector('.req-add').style.display=readonly?'none':'';
+
+  if(!REQ_ITEMS_DRAFT.length){
+    cont.innerHTML=`<div class="req-empty" style="padding:24px">
+      <div class="req-empty-txt" style="font-size:13px">Todavía no agregaste ingredientes</div>
+      <div class="req-empty-sub">Tocá "+ Agregar ingrediente" abajo</div>
+    </div>`;
+    return;
+  }
+
+  cont.innerHTML=REQ_ITEMS_DRAFT.map((it,idx)=>{
+    const ing=INGS.find(x=>x.id===it.ingrediente_id);
+    const nom=ing?ing.nombre:'(ingrediente no encontrado)';
+    const desc=ing?[ing.formato,ing.proveedor].filter(Boolean).join(' · '):'';
+    const undBase=it.unidad||(ing?ing.unidad:'');
+    const tieneCom=!!(it.comentario_pedido&&it.comentario_pedido.trim());
+
+    // Costo histórico vs actual (solo si ya está guardado y hay foto del costo)
+    const cuPedido=it.costo_unitario_pedido||0;
+    const cuHoy=ing?costoUnitario(ing):0;
+    let costoHtml='';
+    if(REQ_ED&&cuPedido>0){
+      const diff=cuHoy-cuPedido;
+      const pct=cuPedido>0?((diff/cuPedido)*100):0;
+      let diffHtml='';
+      if(Math.abs(pct)>=1){
+        const cl=diff>0?'diff-up':'diff-dn';
+        const sg=diff>0?'+':'';
+        diffHtml=`<span class="${cl}">(${sg}${pct.toFixed(0)}%)</span>`;
+      }
+      costoHtml=`<div class="req-costo">
+        <span>Pedido a <strong>${fmt(cuPedido)}</strong>/${undBase}</span>
+        <span>·</span>
+        <span class="now">Hoy <strong>${fmt(cuHoy)}</strong>/${undBase}</span>
+        ${diffHtml}
+      </div>`;
+    }
+
+    // Chips de destinos: seleccionados + botón "+" para agregar
+    const seleccionados=REQ_DESTINOS.filter(d=>it.destinos.includes(d.slug));
+    const chipsSel=seleccionados.map(d=>{
+      if(readonly)return `<span class="req-chip-mini sel disabled">${d.nom}</span>`;
+      return `<button class="req-chip-mini sel" onclick="toggleDestino(${idx},'${d.slug}')">${d.nom} ✕</button>`;
+    }).join('');
+    const btnAdd=(!readonly&&it.destinos.length<2)?`<button class="req-chip-mini add" onclick="toggleDestPop(${idx})">+ destino</button>`:'';
+
+    // Popover de destinos disponibles para agregar
+    const disponibles=REQ_DESTINOS.filter(d=>!it.destinos.includes(d.slug));
+    const chipsPop=disponibles.map(d=>{
+      return `<button class="req-chip-mini" onclick="toggleDestino(${idx},'${d.slug}')">${d.nom}</button>`;
+    }).join('');
+
+    // Acciones (comentario + eliminar)
+    const acts=readonly?'':`
+      <div class="req-item-acts">
+        <button class="req-item-com-btn ${tieneCom?'active':''}" onclick="toggleComRow(${idx})" title="${tieneCom?'Editar comentario':'Agregar comentario'}">💬</button>
+        <button class="req-item-del" onclick="quitarItem(${idx})" title="Quitar">✕</button>
+      </div>`;
+
+    return `<div class="req-item">
+      <div class="req-item-row1">
+        <div class="req-item-info">
+          <div class="req-item-nom">${nom}</div>
+          ${desc?`<div class="req-item-desc">${desc}</div>`:''}
+        </div>
+        <div class="req-item-input">
+          <span class="lab">ped</span>
+          <input type="number" step="0.001" min="0" value="${it.cantidad_pedida||''}" ${readonly?'readonly':''} oninput="updItem(${idx},'cantidad_pedida',this.value)">
+          <span class="unit">${undBase}</span>
+        </div>
+        <div class="req-item-input stk">
+          <span class="lab">stk</span>
+          <input type="number" step="0.001" min="0" value="${it.stock_actual!=null?it.stock_actual:''}" ${readonly?'readonly':''} oninput="updItem(${idx},'stock_actual',this.value)" placeholder="—">
+          <span class="unit">${undBase}</span>
+        </div>
+        ${acts}
+      </div>
+      <div class="req-item-chips">
+        ${chipsSel}
+        ${btnAdd}
+      </div>
+      <div class="req-dest-pop" id="destPop${idx}">${chipsPop}</div>
+      <div class="req-com-row ${tieneCom?'open':''}" id="comRow${idx}">
+        <input type="text" placeholder="Comentario del pedido (opcional)" value="${(it.comentario_pedido||'').replace(/"/g,'&quot;')}" ${readonly?'readonly':''} oninput="updItem(${idx},'comentario_pedido',this.value)">
+      </div>
+      ${costoHtml}
+    </div>`;
+  }).join('');
+}
+
+// Abrir/cerrar popover de destinos disponibles
+function toggleDestPop(idx){
+  const el=document.getElementById('destPop'+idx);
+  if(el)el.classList.toggle('open');
+}
+window.toggleDestPop=toggleDestPop;
+
+// Abrir/cerrar fila de comentario
+function toggleComRow(idx){
+  const el=document.getElementById('comRow'+idx);
+  if(!el)return;
+  el.classList.toggle('open');
+  if(el.classList.contains('open')){
+    const inp=el.querySelector('input');
+    if(inp)setTimeout(()=>inp.focus(),50);
+  }
+}
+window.toggleComRow=toggleComRow;
+
+function updItem(idx,campo,val){
+  if(!REQ_ITEMS_DRAFT[idx])return;
+  if(campo==='cantidad_pedida'||campo==='stock_actual'||campo==='cantidad_recibida'){
+    REQ_ITEMS_DRAFT[idx][campo]=val===''?null:parseFloat(val);
+  } else {
+    REQ_ITEMS_DRAFT[idx][campo]=val;
+  }
+}
+window.updItem=updItem;
+
+function toggleDestino(idx,slug){
+  const it=REQ_ITEMS_DRAFT[idx];
+  if(!it)return;
+  if(!Array.isArray(it.destinos))it.destinos=[];
+  const i=it.destinos.indexOf(slug);
+  if(i>=0){
+    it.destinos.splice(i,1);
+  } else {
+    if(it.destinos.length>=2){
+      toast('Máximo 2 destinos por ingrediente');
+      return;
+    }
+    it.destinos.push(slug);
+  }
+  renderItemsEdit();
+}
+window.toggleDestino=toggleDestino;
+
+function quitarItem(idx){
+  if(!confirm('¿Quitar este ingrediente del pedido?'))return;
+  REQ_ITEMS_DRAFT.splice(idx,1);
+  renderItemsEdit();
+}
+window.quitarItem=quitarItem;
+
+// ---------- Selector de ingredientes ----------
+function abrirSelectorIngrediente(){
+  document.getElementById('reqIngBuscar').value='';
+  filtrarSelectorIng();
+  openOv('ovReqIng');
+}
+window.abrirSelectorIngrediente=abrirSelectorIngrediente;
+
+function filtrarSelectorIng(){
+  const q=(document.getElementById('reqIngBuscar').value||'').toLowerCase().trim();
+  // Solo validados, y excluyendo los ya agregados
+  const yaAgregados=new Set(REQ_ITEMS_DRAFT.map(it=>it.ingrediente_id));
+  let lista=INGS.filter(i=>i.nombre&&i.validado&&i.activo!==false&&!yaAgregados.has(i.id));
+  if(q){
+    lista=lista.filter(i=>{
+      const t=(i.nombre+' '+(i.formato||'')+' '+(i.proveedor||'')).toLowerCase();
+      return t.includes(q);
+    });
+  }
+  lista.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  lista=lista.slice(0,80); // tope para no colgar
+
+  const cont=document.getElementById('reqIngList');
+  if(!lista.length){
+    cont.innerHTML=`<div class="req-ing-empty">${q?'Sin resultados para "'+q+'"':'No quedan ingredientes para agregar'}</div>`;
+    return;
+  }
+  cont.innerHTML=lista.map(i=>{
+    const det=[i.formato,i.proveedor,i.unidad?`unidad base: ${i.unidad}`:''].filter(Boolean).join(' · ');
+    return `<div class="req-ing-opt" onclick="agregarItem(${i.id})">
+      <div class="nom">${i.nombre}</div>
+      ${det?`<div class="det">${det}</div>`:''}
+    </div>`;
+  }).join('');
+}
+window.filtrarSelectorIng=filtrarSelectorIng;
+
+function agregarItem(ingId){
+  const ing=INGS.find(x=>x.id===ingId);
+  if(!ing){toast('Ingrediente no encontrado');return;}
+  REQ_ITEMS_DRAFT.push({
+    ingrediente_id:ing.id,
+    cantidad_pedida:null,
+    unidad:ing.unidad,
+    stock_actual:null,
+    destinos:[],
+    comentario_pedido:'',
+    costo_unitario_pedido:costoUnitario(ing),
+    estado_recepcion:'pendiente',
+    cantidad_recibida:null,
+    comentario_recepcion:''
+  });
+  closeOv('ovReqIng');
+  renderItemsEdit();
+}
+window.agregarItem=agregarItem;
+
+// ---------- Guardar requerimiento (crear o actualizar) ----------
+async function guardarReq(){
+  const local=document.getElementById('reqDetLocal').value;
+  if(!local){toast('Falta el local');return;}
+  if(!REQ_ITEMS_DRAFT.length){toast('Agregá al menos un ingrediente');return;}
+  // Validar que todos los items tengan cantidad
+  for(const it of REQ_ITEMS_DRAFT){
+    if(!it.cantidad_pedida||it.cantidad_pedida<=0){
+      const ing=INGS.find(x=>x.id===it.ingrediente_id);
+      toast(`Falta cantidad para "${ing?ing.nombre:'un ingrediente'}"`);
+      return;
+    }
+  }
+
+  const ahora=new Date().toISOString();
+  const cabecera={
+    local,
+    fecha_deseada:document.getElementById('reqDetFechaDeseada').value||null,
+    fecha_comprometida:document.getElementById('reqDetFechaComp').value||null,
+    observaciones_generales:document.getElementById('reqDetObs').value||null,
+    actualizado_por:CU.id,
+    actualizado_en:ahora
+  };
+
+  let reqId=REQ_ED;
+  if(reqId){
+    // Actualizar cabecera
+    await api(`requerimientos?id=eq.${reqId}`,'PATCH',cabecera);
+  } else {
+    // Crear nuevo
+    cabecera.creado_por=CU.id;
+    cabecera.estado='pendiente';
+    const r=await api('requerimientos','POST',cabecera);
+    if(!r||!r[0]){toast('⛔ No se pudo crear el pedido');return;}
+    reqId=r[0].id;
+  }
+
+  // Items: borrar los viejos y reinsertar (simplifica mucho la lógica)
+  if(REQ_ED){
+    await api(`requerimiento_items?requerimiento_id=eq.${reqId}`,'DELETE');
+  }
+  const itemsBody=REQ_ITEMS_DRAFT.map((it,idx)=>({
+    requerimiento_id:reqId,
+    ingrediente_id:it.ingrediente_id,
+    cantidad_pedida:it.cantidad_pedida,
+    unidad:it.unidad,
+    stock_actual:it.stock_actual,
+    destinos:it.destinos||[],
+    comentario_pedido:it.comentario_pedido||null,
+    costo_unitario_pedido:it.costo_unitario_pedido,
+    estado_recepcion:it.estado_recepcion||'pendiente',
+    cantidad_recibida:it.cantidad_recibida,
+    comentario_recepcion:it.comentario_recepcion||null,
+    orden:idx
+  }));
+  if(itemsBody.length){
+    await api('requerimiento_items','POST',itemsBody);
+  }
+
+  toast(REQ_ED?'✓ Pedido actualizado':'✓ Pedido creado');
+  closeOv('ovReq');
+  await fetchReqs();
+  renderReq();
+}
+window.guardarReq=guardarReq;
+
+// ---------- Cancelar requerimiento ----------
+async function cancelarReq(){
+  if(!REQ_ED)return;
+  if(!confirm('¿Cancelar este pedido? Quedará registrado pero marcado como cancelado.'))return;
+  await api(`requerimientos?id=eq.${REQ_ED}`,'PATCH',{
+    estado:'cancelado',
+    actualizado_por:CU.id,
+    actualizado_en:new Date().toISOString()
+  });
+  toast('Pedido cancelado');
+  closeOv('ovReq');
+  await fetchReqs();
+  renderReq();
+}
+window.cancelarReq=cancelarReq;
+
+// ---------- Eliminar definitivo (solo Admin) ----------
+async function eliminarReq(){
+  if(!REQ_ED)return;
+  if(!reqEsAdmin()){toast('Solo Admin puede eliminar');return;}
+  if(!confirm('¿ELIMINAR DEFINITIVAMENTE este pedido? Esta acción no se puede deshacer.'))return;
+  // Soft delete: marcamos activo=false (los items quedan asociados pero el pedido no aparece)
+  await api(`requerimientos?id=eq.${REQ_ED}`,'PATCH',{
+    activo:false,
+    actualizado_por:CU.id,
+    actualizado_en:new Date().toISOString()
+  });
+  toast('Pedido eliminado');
+  closeOv('ovReq');
+  await fetchReqs();
+  renderReq();
+}
+window.eliminarReq=eliminarReq;
+
+window.loadReq=loadReq;
+
+// ============================================================================
+// PESTAÑAS DEL MÓDULO REQUERIMIENTOS
+// ============================================================================
+let REQ_PANE='req-pedidos'; // pane activa
+let REC_ED=null;            // recepción en curso (id del requerimiento)
+let REC_ITEMS_DRAFT=[];     // items en edición durante la recepción
+
+function switchReqPane(pane){
+  REQ_PANE=pane;
+  document.querySelectorAll('.req-modtab').forEach(b=>b.classList.toggle('active',b.dataset.pane===pane));
+  document.querySelectorAll('.req-pane').forEach(p=>p.classList.toggle('active',p.id===pane));
+  if(pane==='req-recepciones') renderRecepciones();
+}
+window.switchReqPane=switchReqPane;
+
+// ---------- Recepciones: render del listado ----------
+function renderRecepciones(){
+  const cont=document.getElementById('recList');
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const tsHoy=hoy.getTime();
+  // Hace 30 días para el histórico
+  const hace30=new Date(hoy);hace30.setDate(hace30.getDate()-30);
+
+  // Aplicar filtro de local de Compras/Admin si lo hay
+  const filtroLocal=document.getElementById('reqFiltroLocal')?.value||'';
+  let baseLista=REQS;
+  if(filtroLocal) baseLista=baseLista.filter(r=>r.local===filtroLocal);
+
+  // ===== PENDIENTES DE RECIBIR =====
+  let pendientes=baseLista.filter(r=>r.estado==='pendiente');
+  pendientes.sort((a,b)=>{
+    const fa=a.fecha_comprometida||a.fecha_deseada||'9999-12-31';
+    const fb=b.fecha_comprometida||b.fecha_deseada||'9999-12-31';
+    return fa.localeCompare(fb);
+  });
+
+  // Badge en la pestaña con la cantidad de vencidos+hoy
+  const urgentes=pendientes.filter(r=>{
+    const f=r.fecha_comprometida||r.fecha_deseada;
+    if(!f)return false;
+    return new Date(f+'T00:00').getTime()<=tsHoy;
+  }).length;
+  const badge=document.getElementById('recBadgeCount');
+  if(urgentes>0){badge.textContent=urgentes;badge.style.display='inline-block';}
+  else{badge.textContent='';badge.style.display='none';}
+
+  // ===== HISTÓRICO: completados y cancelados de los últimos 30 días =====
+  let historico=baseLista.filter(r=>{
+    if(r.estado!=='completado'&&r.estado!=='cancelado')return false;
+    const fRef=r.actualizado_en||r.fecha_creacion;
+    if(!fRef)return false;
+    return new Date(fRef).getTime()>=hace30.getTime();
+  });
+  historico.sort((a,b)=>{
+    const fa=a.actualizado_en||a.fecha_creacion||'';
+    const fb=b.actualizado_en||b.fecha_creacion||'';
+    return fb.localeCompare(fa); // más reciente primero
+  });
+
+  // Render
+  let html='';
+
+  // Sección Pendientes
+  html+=`<div style="font-size:12px;font-weight:700;color:var(--dark);text-transform:uppercase;letter-spacing:0.8px;margin:8px 0 10px;display:flex;align-items:center;gap:8px">
+    <span style="display:inline-block;width:8px;height:8px;background:var(--rust);border-radius:50%"></span>
+    Pendientes de recibir
+    <span style="font-weight:500;color:var(--gray);text-transform:none;letter-spacing:0">(${pendientes.length})</span>
+  </div>`;
+
+  if(!pendientes.length){
+    html+=`<div class="req-empty" style="margin-bottom:24px">
+      <div class="req-empty-icon">📥</div>
+      <div class="req-empty-txt">No hay pedidos esperando recepción</div>
+      <div class="req-empty-sub">¡Todo al día!</div>
+    </div>`;
+  } else {
+    html+='<div class="req-list" style="margin-bottom:24px">';
+    html+=pendientes.map(r=>renderRecCard(r,true,tsHoy)).join('');
+    html+='</div>';
+  }
+
+  // Sección Histórico
+  html+=`<div style="font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:0.8px;margin:18px 0 10px">
+    Histórico — últimos 30 días <span style="font-weight:500;text-transform:none;letter-spacing:0">(${historico.length})</span>
+  </div>`;
+
+  if(!historico.length){
+    html+=`<div class="req-empty">
+      <div class="req-empty-txt" style="font-size:13px">Sin pedidos completados ni cancelados en los últimos 30 días</div>
+    </div>`;
+  } else {
+    html+='<div class="req-list">';
+    html+=historico.map(r=>renderRecCard(r,false,tsHoy)).join('');
+    html+='</div>';
+  }
+
+  cont.innerHTML=html;
+}
+window.renderRecepciones=renderRecepciones;
+
+// Render de una tarjeta individual en Recepciones (pendiente o histórico)
+function renderRecCard(r,esPendiente,tsHoy){
+  const items=r.requerimiento_items||[];
+  const recibidos=items.filter(it=>it.estado_recepcion&&it.estado_recepcion!=='pendiente').length;
+  const fPed=r.fecha_deseada?new Date(r.fecha_deseada+'T00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}):null;
+  const fEnt=r.fecha_comprometida?new Date(r.fecha_comprometida+'T00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}):null;
+  const localNom=reqNomLocal(r.local);
+  const est=estadoPedido(r);
+  const badge=`<span class="req-badge ${est.claseBadge}">${est.icon?est.icon+' ':''}${est.label}</span>`;
+
+  // Para histórico, mostrar fecha en que se completó/canceló
+  let metaExtra='';
+  if(!esPendiente&&r.actualizado_en){
+    const fComp=new Date(r.actualizado_en).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+    metaExtra=`<br><span style="color:var(--gray);font-size:11px">${r.estado==='completado'?'Completado':'Cancelado'} el ${fComp}</span>`;
+  }
+
+  return `<div class="req-card ${est.claseCard}" onclick="abrirRecepcion(${r.id})">
+    <div class="req-card-hdr">
+      <span class="req-card-id">Pedido #${r.id}</span>
+      ${badge}
+    </div>
+    <div class="req-card-meta">
+      <strong>${localNom}</strong>
+      ${fPed?`<br>📅 F. de pedido: ${fPed}`:''}
+      ${fEnt?` · F. est. entrega: <strong>${fEnt}</strong>`:''}
+      ${metaExtra}
+    </div>
+    <div class="req-card-foot">
+      <span>${items.length} ingrediente${items.length===1?'':'s'} · ${recibidos}/${items.length} recibido${recibidos===1?'':'s'}</span>
+      <span style="font-size:14px">›</span>
+    </div>
+  </div>`;
+}
+
+// ---------- Abrir modal de recepción guiada ----------
+function abrirRecepcion(id){
+  const r=REQS.find(x=>x.id===id);
+  if(!r){toast('Pedido no encontrado');return;}
+
+  // Permiso: solo Compras/Admin o gente del local que recibe
+  const puede=reqEsCompras()||(CU.local===r.local);
+  if(!puede){toast('⛔ No podés marcar recepción de otro local');return;}
+
+  REC_ED=id;
+  REC_ITEMS_DRAFT=(r.requerimiento_items||[]).map(it=>({
+    id:it.id,
+    ingrediente_id:it.ingrediente_id,
+    cantidad_pedida:it.cantidad_pedida,
+    unidad:it.unidad,
+    estado_recepcion:it.estado_recepcion||'pendiente',
+    cantidad_recibida:it.cantidad_recibida,
+    comentario_recepcion:it.comentario_recepcion||''
+  }));
+
+  document.getElementById('recTitulo').textContent=`Recibiendo pedido #${r.id}`;
+
+  // Cabecera con info del pedido
+  const localNom=reqNomLocal(r.local);
+  const fCom=r.fecha_comprometida?new Date(r.fecha_comprometida+'T00:00').toLocaleDateString('es-AR'):'—';
+  const fDes=r.fecha_deseada?new Date(r.fecha_deseada+'T00:00').toLocaleDateString('es-AR'):'—';
+  document.getElementById('recHdr').innerHTML=`
+    <div class="rec-hdr-top">
+      <span class="rec-hdr-id">Pedido #${r.id}</span>
+      <span class="req-badge req-b-pend">Recepción</span>
+    </div>
+    <div class="rec-hdr-meta">
+      <strong>${localNom}</strong><br>
+      📅 F. de pedido: ${fDes} · F. est. entrega: <strong>${fCom}</strong>
+      ${r.observaciones_generales?`<br>📝 ${r.observaciones_generales}`:''}
+    </div>
+    <div class="rec-progress"><div class="rec-progress-bar" id="recBar" style="width:0%"></div></div>
+    <div class="rec-progress-txt" id="recBarTxt"></div>
+  `;
+
+  renderRecItems();
+  openOv('ovRec');
+}
+window.abrirRecepcion=abrirRecepcion;
+
+// ---------- Render de items en modo recepción ----------
+function renderRecItems(){
+  const cont=document.getElementById('recItems');
+  const total=REC_ITEMS_DRAFT.length;
+  const hechos=REC_ITEMS_DRAFT.filter(it=>it.estado_recepcion&&it.estado_recepcion!=='pendiente').length;
+
+  // Barra de progreso
+  const pct=total?Math.round((hechos/total)*100):0;
+  document.getElementById('recBar').style.width=pct+'%';
+  document.getElementById('recBarTxt').textContent=`${hechos} de ${total} recibido${hechos===1?'':'s'} (${pct}%)`;
+
+  cont.innerHTML=REC_ITEMS_DRAFT.map((it,idx)=>{
+    const ing=INGS.find(x=>x.id===it.ingrediente_id);
+    const nom=ing?ing.nombre:'(ingrediente)';
+    const desc=ing?[ing.formato,ing.proveedor].filter(Boolean).join(' · '):'';
+    const done=it.estado_recepcion&&it.estado_recepcion!=='pendiente';
+    const necesitaComentario=it.estado_recepcion==='modificado'||it.estado_recepcion==='incompleto';
+
+    const estados=[
+      {slug:'correcto',ic:'✓',lab:'Correcto'},
+      {slug:'modificado',ic:'~',lab:'Modificado'},
+      {slug:'incompleto',ic:'!',lab:'Incompleto'},
+      {slug:'pendiente',ic:'⏸',lab:'Pendiente'}
+    ];
+    const btns=estados.map(e=>{
+      const sel=(it.estado_recepcion||'pendiente')===e.slug;
+      return `<button class="rec-btn ${e.slug} ${sel?'sel':''}" onclick="marcarRecep(${idx},'${e.slug}')">
+        <span class="ic">${e.ic}</span>
+        <span>${e.lab}</span>
+      </button>`;
+    }).join('');
+
+    return `<div class="rec-item ${done?'done':''}">
+      <div class="rec-item-top">
+        <div>
+          <div class="rec-item-nom">${nom}</div>
+          ${desc?`<div class="rec-item-desc">${desc}</div>`:''}
+          <div class="rec-item-cant">Pedido: <strong>${it.cantidad_pedida} ${it.unidad}</strong></div>
+        </div>
+      </div>
+      <div class="rec-btns">${btns}</div>
+      <div class="rec-comentario ${necesitaComentario||it.comentario_recepcion?'open':''}" id="recCom${idx}">
+        <div class="lab">Comentario de recepción ${necesitaComentario?'(qué pasó)':'(opcional)'}</div>
+        <input type="text" placeholder="${it.estado_recepcion==='modificado'?'Ej: vinieron 4 en vez de 5':it.estado_recepcion==='incompleto'?'Ej: faltó la mitad, prometen mañana':'Notas adicionales...'}" value="${(it.comentario_recepcion||'').replace(/"/g,'&quot;')}" oninput="updRecItem(${idx},'comentario_recepcion',this.value)">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function marcarRecep(idx,slug){
+  if(!REC_ITEMS_DRAFT[idx])return;
+  REC_ITEMS_DRAFT[idx].estado_recepcion=slug;
+  renderRecItems();
+}
+window.marcarRecep=marcarRecep;
+
+function updRecItem(idx,campo,val){
+  if(!REC_ITEMS_DRAFT[idx])return;
+  REC_ITEMS_DRAFT[idx][campo]=val;
+}
+window.updRecItem=updRecItem;
+
+// ---------- Guardar la recepción ----------
+async function guardarRecepcion(){
+  if(!REC_ED)return;
+
+  const ahora=new Date().toISOString();
+  // Validación: si está "modificado" o "incompleto", recomendar comentario (pero no obligar)
+  const sinComentario=REC_ITEMS_DRAFT.filter(it=>(it.estado_recepcion==='modificado'||it.estado_recepcion==='incompleto')&&(!it.comentario_recepcion||!it.comentario_recepcion.trim()));
+  if(sinComentario.length){
+    const nombres=sinComentario.slice(0,3).map(it=>{
+      const ing=INGS.find(x=>x.id===it.ingrediente_id);
+      return ing?ing.nombre:'(ingrediente)';
+    }).join(', ');
+    if(!confirm(`Hay ${sinComentario.length} ingrediente${sinComentario.length===1?'':'s'} marcado${sinComentario.length===1?'':'s'} como Modificado/Incompleto sin comentario:\n\n${nombres}${sinComentario.length>3?'...':''}\n\n¿Guardar igual?`))return;
+  }
+
+  // Actualizar cada item modificado
+  for(const it of REC_ITEMS_DRAFT){
+    if(!it.id)continue;
+    await api(`requerimiento_items?id=eq.${it.id}`,'PATCH',{
+      estado_recepcion:it.estado_recepcion||'pendiente',
+      cantidad_recibida:it.cantidad_recibida,
+      comentario_recepcion:it.comentario_recepcion||null,
+      recibido_en:(it.estado_recepcion&&it.estado_recepcion!=='pendiente')?ahora:null,
+      recibido_por:(it.estado_recepcion&&it.estado_recepcion!=='pendiente')?CU.id:null
+    });
+  }
+
+  // Auto-completado: si TODOS los items tienen estado distinto a pendiente, el requerimiento pasa a completado
+  const todosRecibidos=REC_ITEMS_DRAFT.every(it=>it.estado_recepcion&&it.estado_recepcion!=='pendiente');
+  if(todosRecibidos){
+    await api(`requerimientos?id=eq.${REC_ED}`,'PATCH',{
+      estado:'completado',
+      actualizado_por:CU.id,
+      actualizado_en:ahora
+    });
+    toast('🎉 Pedido completado');
+  } else {
+    await api(`requerimientos?id=eq.${REC_ED}`,'PATCH',{
+      actualizado_por:CU.id,
+      actualizado_en:ahora
+    });
+    toast('✓ Recepción guardada');
+  }
+
+  closeOv('ovRec');
+  await fetchReqs();
+  renderReq();
+  renderRecepciones();
+}
+window.guardarRecepcion=guardarRecepcion;
+
+// Hook: cuando se carga la vista, también refrescar el badge de Recepciones
+const _origLoadReq=loadReq;
+loadReq=async function(){
+  await _origLoadReq();
+  renderRecepciones(); // para refrescar el badge aunque no estés en esa pestaña
+};
+window.loadReq=loadReq;
+
+// ============================================================================
+// FIN MÓDULO REQUERIMIENTOS
+// ============================================================================
 
 checkSession();
 })();
