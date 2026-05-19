@@ -227,6 +227,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 /* ===== Paleta unificada de estados de pedido ===== */
 /* Cada estado tiene un color para el borde-izquierdo de la card y un badge */
 .req-card{position:relative;border-left:4px solid var(--sand);padding-left:12px}
+.req-card.st-borrador{border-left-color:#9B59B6;background:#FAF5FC}
 .req-card.st-vencido{border-left-color:#C0392B}
 .req-card.st-hoy{border-left-color:#C4622D}
 .req-card.st-parcial{border-left-color:#2980B9}
@@ -236,6 +237,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .req-card.st-canc{border-left-color:#8A8278;opacity:0.7}
 
 /* Badges por estado */
+.req-b-borrador{background:#F3E8FA;color:#7D3C98}
 .req-b-vencido{background:#FFEBEE;color:#C0392B}
 .req-b-hoy{background:#FFF3E0;color:#E65100}
 .req-b-parcial{background:#E3F2FD;color:#1565C0}
@@ -243,6 +245,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .req-b-completo{background:#E8F5E9;color:#2E7D32}
 .req-b-completoobs{background:#FFF8E1;color:#B7791F}
 .req-b-cancelado{background:#F5F5F5;color:#757575}
+
+/* Combo cantidad + unidad para items */
+.req-item-pair{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:96px}
+.req-item-pair .lab{font-size:9px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;color:var(--gray);line-height:1;text-align:center}
+.req-item-pair .inputs{display:flex;gap:3px}
+.req-item-pair input{width:42px;padding:5px 4px;font-size:12px;border:1px solid var(--sand);border-radius:5px;text-align:right;outline:none;font-family:inherit;color:var(--dark);background:var(--white)}
+.req-item-pair input:focus{border-color:var(--olive)}
+.req-item-pair select{flex:1;padding:5px 4px;font-size:11px;border:1px solid var(--sand);border-radius:5px;outline:none;font-family:inherit;color:var(--dark);background:var(--white);min-width:60px}
+.req-item-pair select:focus{border-color:var(--olive)}
+.req-item-pair.stk input,.req-item-pair.stk select{background:var(--cream)}
+.req-item-pair.req input:invalid,.req-item-pair.req select:invalid{border-color:#E67E22}
 
 .req-empty{text-align:center;padding:48px 20px;color:var(--gray);background:var(--white);border-radius:12px;border:2px dashed var(--sand-l)}
 .req-empty-icon{font-size:48px;margin-bottom:12px;opacity:0.5}
@@ -611,7 +624,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   <div class="app-hdr">
     <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Requerimientos</div></div>
     <div class="app-btns">
-      <button class="abtn ao" onclick="openReqNuevo()">+ Nuevo pedido</button>
+      <button class="abtn ao" onclick="openReqNuevo()">+ Nuevo pre-pedido</button>
       <button class="abtn ab" onclick="showView('vDash')">← Dashboard</button>
     </div>
   </div>
@@ -623,6 +636,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="req-modtabs">
       <button class="req-modtab active" data-pane="req-pedidos" onclick="switchReqPane('req-pedidos')">📋 Requerimientos</button>
       <button class="req-modtab" data-pane="req-recepciones" onclick="switchReqPane('req-recepciones')">📥 Recepciones <span id="recBadgeCount" style="font-size:10px;background:var(--rust);color:var(--white);padding:1px 6px;border-radius:8px;font-weight:600"></span></button>
+      <button class="req-modtab" data-pane="req-stock" onclick="switchReqPane('req-stock')">📦 Stock</button>
       <button class="req-modtab" data-pane="req-insumos" onclick="switchReqPane('req-insumos')">🧂 Insumos <span class="badge-soon">Pronto</span></button>
       <button class="req-modtab" data-pane="req-stats" onclick="switchReqPane('req-stats')">📊 Estadísticas <span class="badge-soon">Pronto</span></button>
     </div>
@@ -636,9 +650,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         </select>
       </div>
 
-      <!-- Tabs: Pendientes / Completados / Cancelados -->
+      <!-- Tabs: Borrador / Pendientes / Completados / Cancelados -->
       <div class="req-tabs">
-        <button class="req-tab active" data-tab="pendiente" onclick="switchReqTab('pendiente')">Pendientes <span class="ct" id="reqCntPend">0</span></button>
+        <button class="req-tab active" data-tab="borrador" onclick="switchReqTab('borrador')">📝 Pre-pedidos <span class="ct" id="reqCntBorr">0</span></button>
+        <button class="req-tab" data-tab="pendiente" onclick="switchReqTab('pendiente')">Pendientes <span class="ct" id="reqCntPend">0</span></button>
         <button class="req-tab" data-tab="completado" onclick="switchReqTab('completado')">Completados <span class="ct" id="reqCntComp">0</span></button>
         <button class="req-tab" data-tab="cancelado" onclick="switchReqTab('cancelado')">Cancelados <span class="ct" id="reqCntCanc">0</span></button>
       </div>
@@ -650,6 +665,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="req-pane" id="req-recepciones">
       <div class="psub" style="margin-top:0">Pendientes de recibir (vencidos primero) y histórico de los últimos 30 días.</div>
       <div class="req-list" id="recList"></div>
+    </div>
+
+    <!-- ====== Pane: Stock ====== -->
+    <div class="req-pane" id="req-stock">
+      <div class="psub" style="margin-top:0">Recuento de stock por local. Se listan los insumos pedidos en los últimos 60 días. Se guardan los últimos 5 recuentos.</div>
+
+      <!-- Filtro de local para Compras/Admin -->
+      <div class="req-filter" id="stockFilterRow" style="display:none">
+        <select id="stockFiltroLocal" onchange="loadStockRecuentos()">
+          <option value="">Seleccionar local...</option>
+          <option value="azafran">Azafrán</option>
+          <option value="trapiche">Espacio Trapiche</option>
+          <option value="nieto">Nieto Senetiner</option>
+          <option value="vinobien">Vinobien</option>
+          <option value="cobos">Viña Cobos</option>
+        </select>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="abtn ao" onclick="openStockNuevo()" id="stockBtnNuevo">+ Nuevo recuento</button>
+      </div>
+
+      <div id="stockList"></div>
     </div>
 
     <!-- ====== Pane: Insumos (placeholder) ====== -->
@@ -685,6 +723,42 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="req-acciones" style="margin-top:16px">
       <button class="btn bp" onclick="guardarRecepcion()">💾 Guardar recepción</button>
       <button class="btn bs" onclick="closeOv('ovRec')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Recuento de Stock -->
+<div class="overlay" id="ovStock">
+  <div class="modal wide">
+    <button class="mc" onclick="closeOv('ovStock')">✕</button>
+    <h2 id="stockTitulo">Nuevo recuento de stock</h2>
+
+    <div class="req-detail">
+      <div class="req-detail-grid">
+        <div class="req-field">
+          <label>Local</label>
+          <input type="text" id="stockDetLocal" class="ro" readonly>
+        </div>
+        <div class="req-field">
+          <label>Fecha</label>
+          <input type="text" id="stockDetFecha" class="ro" readonly>
+        </div>
+      </div>
+      <div class="req-field">
+        <label>Observaciones (opcional)</label>
+        <textarea id="stockDetObs" placeholder="Notas sobre este recuento..."></textarea>
+      </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;color:var(--dark);margin-bottom:8px">
+      Insumos pedidos en los últimos 60 días <span id="stockItemsCount" style="color:var(--gray);font-weight:500"></span>
+    </div>
+    <div class="req-items" id="stockItems"></div>
+
+    <div class="req-acciones" style="margin-top:16px">
+      <button class="btn bp" onclick="guardarRecuento()" id="stockBtnGuardar">💾 Guardar recuento</button>
+      <button class="btn bs" onclick="exportarRecuentoExcel()" id="stockBtnExport">📊 Exportar a Excel</button>
+      <button class="btn bs" onclick="closeOv('ovStock')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -738,6 +812,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <!-- Acciones -->
     <div class="req-acciones">
       <button class="btn bp" onclick="guardarReq()" id="reqBtnGuardar">💾 Guardar</button>
+      <button class="btn bp" style="background:#9B59B6" onclick="confirmarReq()" id="reqBtnConfirmar">🚀 Confirmar pedido</button>
       <button class="btn bs" onclick="closeOv('ovReq')">Cancelar</button>
       <button class="btn bd" onclick="cancelarReq()" id="reqBtnCancelar" style="display:none">🚫 Cancelar pedido</button>
       <button class="btn bd" onclick="eliminarReq()" id="reqBtnEliminar" style="display:none">🗑 Eliminar</button>
@@ -2123,9 +2198,14 @@ window.diagIngredientes=diagIngredientes;
 // ============================================================================
 // Estado del módulo (variables propias para no chocar con otras)
 let REQS=[];           // listado de requerimientos cargados
-let REQ_TAB='pendiente'; // tab activa: pendiente / completado / cancelado
+let REQ_TAB='pendiente'; // tab activa: pendiente / completado / cancelado / borrador (se ajusta segun rol al cargar)
 let REQ_ED=null;       // requerimiento en edición (id o null si es nuevo)
 let REQ_ITEMS_DRAFT=[]; // items en edición (en memoria, antes de guardar)
+let UNIDADES=[];       // catálogo de unidades de pedido (cargado desde Supabase)
+let STOCK_RECUENTOS=[]; // recuentos de stock del local activo
+let STOCK_ED=null;     // recuento en edición
+let STOCK_ITEMS_DRAFT=[]; // items del recuento en edición
+
 const REQ_DESTINOS=[
   {slug:'menu',nom:'Menú'},
   {slug:'prueba',nom:'Prueba'},
@@ -2151,6 +2231,9 @@ async function loadReq(){
   // sin pasar por Recetas/Platos, la lista global está vacía y los items mostrarían "(ingrediente)")
   await loadAll();
 
+  // Cargar unidades de pedido (catálogo editable)
+  await fetchUnidades();
+
   // Mostrar/ocultar filtro de local (solo Compras/Admin)
   const filterRow=document.getElementById('reqFilterRow');
   if(reqEsCompras()){
@@ -2173,7 +2256,15 @@ async function loadReq(){
   const sub=document.getElementById('reqSubtitle');
   if(reqEsAdmin()) sub.textContent='Pedidos de ingredientes y su seguimiento. Como Admin podés ver y editar todos.';
   else if(reqEsCompras()) sub.textContent='Pedidos de ingredientes. Como Compras revisás y comprometés fechas.';
-  else sub.textContent=`Pedidos de ingredientes para tu local. Creá y editá los pedidos pendientes.`;
+  else sub.textContent=`Pedidos de ingredientes para tu local. Creá pre-pedidos y editalos antes de confirmar.`;
+
+  // Default tab según rol: Cocina arranca en Pre-pedidos, Compras/Admin en Pendientes
+  if(!reqEsCompras()){
+    REQ_TAB='borrador';
+  } else {
+    REQ_TAB='pendiente';
+  }
+  document.querySelectorAll('.req-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===REQ_TAB));
 
   await fetchReqs();
   renderReq();
@@ -2184,11 +2275,34 @@ async function fetchReqs(){
   let q='requerimientos?select=*,requerimiento_items(*)&activo=eq.true&order=fecha_creacion.desc';
   const localUsuario=reqLocalDelUsuario();
   if(localUsuario){
-    // Cocina/local: solo los suyos
+    // Cocina/local: solo los suyos (incluye sus borradores)
     q+=`&local=eq.${encodeURIComponent(localUsuario)}`;
+  } else if(reqEsCompras()&&!reqEsAdmin()){
+    // Compras (no admin): NO ve borradores ajenos
+    q+=`&estado=neq.borrador`;
   }
   const data=await api(q);
   REQS=data||[];
+}
+
+// ---------- Trae unidades de pedido editables ----------
+async function fetchUnidades(){
+  const data=await api('unidades_pedido?select=*&activo=eq.true&order=orden.asc,nombre.asc');
+  UNIDADES=data||[];
+}
+
+// Devuelve el HTML <option> de un select de unidades, con la seleccionada marcada
+function optsUnidades(sel){
+  return '<option value="">— elegir —</option>' + UNIDADES.map(u=>{
+    const s=(sel===u.slug)?'selected':'';
+    return `<option value="${u.slug}" ${s}>${u.nombre} (${u.abreviacion})</option>`;
+  }).join('');
+}
+
+function nomUnidad(slug){
+  if(!slug)return '';
+  const u=UNIDADES.find(x=>x.slug===slug);
+  return u?u.abreviacion:slug;
 }
 
 // ---------- Render del listado ----------
@@ -2199,22 +2313,34 @@ function renderReq(){
   if(filtroLocal) lista=lista.filter(r=>r.local===filtroLocal);
 
   // Contadores por estado
+  const borr=lista.filter(r=>r.estado==='borrador').length;
   const pend=lista.filter(r=>r.estado==='pendiente').length;
   const comp=lista.filter(r=>r.estado==='completado').length;
   const canc=lista.filter(r=>r.estado==='cancelado').length;
+  const elBorr=document.getElementById('reqCntBorr');
+  if(elBorr) elBorr.textContent=borr;
   document.getElementById('reqCntPend').textContent=pend;
   document.getElementById('reqCntComp').textContent=comp;
   document.getElementById('reqCntCanc').textContent=canc;
+
+  // Compras (no admin) no ve la tab Borradores: ocultarla
+  const tabBorr=document.querySelector('.req-tab[data-tab="borrador"]');
+  if(tabBorr){
+    const ocultarBorr=reqEsCompras()&&!reqEsAdmin();
+    tabBorr.style.display=ocultarBorr?'none':'';
+    if(ocultarBorr&&REQ_TAB==='borrador') REQ_TAB='pendiente';
+  }
 
   // Filtrar por tab activa
   const visibles=lista.filter(r=>r.estado===REQ_TAB);
 
   const cont=document.getElementById('reqList');
   if(!visibles.length){
+    const labels={borrador:'pre-pedidos',pendiente:'pendientes',completado:'completados',cancelado:'cancelados'};
     cont.innerHTML=`<div class="req-empty">
-      <div class="req-empty-icon">📦</div>
-      <div class="req-empty-txt">No hay requerimientos ${REQ_TAB==='pendiente'?'pendientes':REQ_TAB+'s'}</div>
-      <div class="req-empty-sub">${REQ_TAB==='pendiente'?'Hacé click en "+ Nuevo pedido" para crear uno':''}</div>
+      <div class="req-empty-icon">${REQ_TAB==='borrador'?'📝':'📦'}</div>
+      <div class="req-empty-txt">No hay ${labels[REQ_TAB]||REQ_TAB}</div>
+      <div class="req-empty-sub">${REQ_TAB==='borrador'?'Tocá "+ Nuevo pedido" para crear uno':''}</div>
     </div>`;
     return;
   }
@@ -2254,6 +2380,9 @@ function reqNomLocal(slug){
 // Devuelve el "estado visual" del pedido (incluye derivados como vencido / hoy / parcial / con observaciones)
 // Retorna un objeto: { slug, label, icon, claseCard, claseBadge }
 function estadoPedido(r){
+  if(r.estado==='borrador'){
+    return {slug:'borrador',label:'Pre-pedido',icon:'📝',claseCard:'st-borrador',claseBadge:'req-b-borrador'};
+  }
   if(r.estado==='cancelado'){
     return {slug:'canc',label:'Cancelado',icon:'',claseCard:'st-canc',claseBadge:'req-b-cancelado'};
   }
@@ -2299,8 +2428,8 @@ window.renderReq=renderReq;
 function openReqNuevo(){
   REQ_ED=null;
   REQ_ITEMS_DRAFT=[];
-  document.getElementById('reqDetTitulo').textContent='Nuevo requerimiento';
-  document.getElementById('reqDetEstado').value='Pendiente';
+  document.getElementById('reqDetTitulo').textContent='Nuevo pre-pedido';
+  document.getElementById('reqDetEstado').value='Pre-pedido (borrador)';
   document.getElementById('reqDetObs').value='';
   document.getElementById('reqDetFechaDeseada').value='';
   document.getElementById('reqDetFechaComp').value='';
@@ -2314,9 +2443,15 @@ function openReqNuevo(){
   // Cocina no puede cambiar el local del pedido (solo crea para el suyo)
   selLocal.disabled=!reqEsCompras();
 
-  // Compras no puede tocar la fecha deseada al crear (la pone Cocina); pero como es nuevo, la deja editar igual
-  // Acciones disponibles
+  // En un pre-pedido nuevo, Cocina NO puede tocar fecha estimada (es de Compras)
+  document.getElementById('reqDetFechaDeseada').disabled=false;
+  document.getElementById('reqDetFechaComp').disabled=!reqEsCompras();
+  document.getElementById('reqDetObs').disabled=false;
+
+  // Acciones disponibles para un pre-pedido nuevo
   document.getElementById('reqBtnGuardar').style.display='';
+  const btnConf=document.getElementById('reqBtnConfirmar');
+  if(btnConf) btnConf.style.display=''; // siempre disponible al crear nuevo
   document.getElementById('reqBtnCancelar').style.display='none';
   document.getElementById('reqBtnEliminar').style.display='none';
 
@@ -2333,37 +2468,59 @@ async function abrirReq(id){
     id:it.id,
     ingrediente_id:it.ingrediente_id,
     cantidad_pedida:it.cantidad_pedida,
-    unidad:it.unidad,
+    unidad:it.unidad||'',
     stock_actual:it.stock_actual,
+    unidad_stock:it.unidad_stock||'',
     destinos:Array.isArray(it.destinos)?it.destinos.slice():[],
     comentario_pedido:it.comentario_pedido||'',
-    costo_unitario_pedido:it.costo_unitario_pedido,
     estado_recepcion:it.estado_recepcion||'pendiente',
     cantidad_recibida:it.cantidad_recibida,
     comentario_recepcion:it.comentario_recepcion||''
   }));
 
-  document.getElementById('reqDetTitulo').textContent=`Pedido #${r.id}`;
-  document.getElementById('reqDetEstado').value=({pendiente:'Pendiente',completado:'Completado',cancelado:'Cancelado'})[r.estado]||r.estado;
+  const est=estadoPedido(r);
+  document.getElementById('reqDetTitulo').textContent=`${r.estado==='borrador'?'Pre-pedido':'Pedido'} #${r.id}`;
+  document.getElementById('reqDetEstado').value=est.label;
   document.getElementById('reqDetLocal').value=r.local||'azafran';
   document.getElementById('reqDetFechaDeseada').value=r.fecha_deseada||'';
   document.getElementById('reqDetFechaComp').value=r.fecha_comprometida||'';
   document.getElementById('reqDetObs').value=r.observaciones_generales||'';
 
-  // Permisos según rol y estado
-  const editable=(r.estado==='pendiente'||r.estado==='completado'&&reqEsAdmin());
+  // ===== PERMISOS ESTRICTOS =====
   const esMiLocal=reqEsCompras()||(CU.local===r.local);
-  const puedeEditar=esMiLocal&&editable&&r.estado!=='cancelado';
+  const esBorrador=(r.estado==='borrador');
+  const esPendiente=(r.estado==='pendiente');
+  const esCompletado=(r.estado==='completado');
+  const esCancelado=(r.estado==='cancelado');
 
-  // Cocina: no puede cambiar local, no puede tocar fecha comprometida
-  document.getElementById('reqDetLocal').disabled=!reqEsCompras()||!puedeEditar;
-  document.getElementById('reqDetFechaDeseada').disabled=!puedeEditar;
-  document.getElementById('reqDetFechaComp').disabled=!reqEsCompras()||!puedeEditar;
+  // ¿Puede editar el pedido (cabecera + items)?
+  let puedeEditar=false;
+  if(reqEsAdmin()) puedeEditar=!esCancelado; // Admin edita todo menos cancelados
+  else if(reqEsCompras()) puedeEditar=!esCancelado&&!esCompletado; // Compras edita pendientes (no completados ni cancelados)
+  else if(esMiLocal) puedeEditar=esBorrador; // Cocina solo edita SUS borradores (NO edita pedidos ya confirmados)
+
+  // ¿Puede tocar fecha estimada de entrega? Solo Compras y Admin
+  const puedeTocarFechaEnt=puedeEditar&&reqEsCompras();
+  // ¿Puede tocar fecha de pedido? El que pueda editar
+  const puedeTocarFechaPed=puedeEditar;
+  // ¿Puede cambiar el local? Solo Compras/Admin y solo si está editable
+  const puedeTocarLocal=puedeEditar&&reqEsCompras();
+
+  document.getElementById('reqDetLocal').disabled=!puedeTocarLocal;
+  document.getElementById('reqDetFechaDeseada').disabled=!puedeTocarFechaPed;
+  document.getElementById('reqDetFechaComp').disabled=!puedeTocarFechaEnt;
   document.getElementById('reqDetObs').disabled=!puedeEditar;
 
   document.getElementById('reqBtnGuardar').style.display=puedeEditar?'':'none';
-  document.getElementById('reqBtnCancelar').style.display=(puedeEditar&&r.estado==='pendiente')?'':'none';
+  // Confirmar (solo en borradores propios o de Admin)
+  const btnConf=document.getElementById('reqBtnConfirmar');
+  if(btnConf) btnConf.style.display=(esBorrador&&puedeEditar)?'':'none';
+  // Cancelar (en borradores o pendientes)
+  document.getElementById('reqBtnCancelar').style.display=(puedeEditar&&(esBorrador||esPendiente))?'':'none';
   document.getElementById('reqBtnEliminar').style.display=reqEsAdmin()?'':'none';
+
+  // Si el item ya está marcado como recibido, no se puede editar más (salvo Admin)
+  // Esto se aplica en renderItemsEdit a nivel item
 
   renderItemsEdit(!puedeEditar);
   openOv('ovReq');
@@ -2388,31 +2545,9 @@ function renderItemsEdit(readonly=false){
     const ing=INGS.find(x=>x.id===it.ingrediente_id);
     const nom=ing?ing.nombre:'(ingrediente no encontrado)';
     const desc=ing?[ing.formato,ing.proveedor].filter(Boolean).join(' · '):'';
-    const undBase=it.unidad||(ing?ing.unidad:'');
     const tieneCom=!!(it.comentario_pedido&&it.comentario_pedido.trim());
 
-    // Costo histórico vs actual (solo si ya está guardado y hay foto del costo)
-    const cuPedido=it.costo_unitario_pedido||0;
-    const cuHoy=ing?costoUnitario(ing):0;
-    let costoHtml='';
-    if(REQ_ED&&cuPedido>0){
-      const diff=cuHoy-cuPedido;
-      const pct=cuPedido>0?((diff/cuPedido)*100):0;
-      let diffHtml='';
-      if(Math.abs(pct)>=1){
-        const cl=diff>0?'diff-up':'diff-dn';
-        const sg=diff>0?'+':'';
-        diffHtml=`<span class="${cl}">(${sg}${pct.toFixed(0)}%)</span>`;
-      }
-      costoHtml=`<div class="req-costo">
-        <span>Pedido a <strong>${fmt(cuPedido)}</strong>/${undBase}</span>
-        <span>·</span>
-        <span class="now">Hoy <strong>${fmt(cuHoy)}</strong>/${undBase}</span>
-        ${diffHtml}
-      </div>`;
-    }
-
-    // Chips de destinos: seleccionados + botón "+" para agregar
+    // Chips de destinos
     const seleccionados=REQ_DESTINOS.filter(d=>it.destinos.includes(d.slug));
     const chipsSel=seleccionados.map(d=>{
       if(readonly)return `<span class="req-chip-mini sel disabled">${d.nom}</span>`;
@@ -2420,18 +2555,19 @@ function renderItemsEdit(readonly=false){
     }).join('');
     const btnAdd=(!readonly&&it.destinos.length<2)?`<button class="req-chip-mini add" onclick="toggleDestPop(${idx})">+ destino</button>`:'';
 
-    // Popover de destinos disponibles para agregar
     const disponibles=REQ_DESTINOS.filter(d=>!it.destinos.includes(d.slug));
     const chipsPop=disponibles.map(d=>{
       return `<button class="req-chip-mini" onclick="toggleDestino(${idx},'${d.slug}')">${d.nom}</button>`;
     }).join('');
 
-    // Acciones (comentario + eliminar)
     const acts=readonly?'':`
       <div class="req-item-acts">
         <button class="req-item-com-btn ${tieneCom?'active':''}" onclick="toggleComRow(${idx})" title="${tieneCom?'Editar comentario':'Agregar comentario'}">💬</button>
         <button class="req-item-del" onclick="quitarItem(${idx})" title="Quitar">✕</button>
       </div>`;
+
+    const roAttr=readonly?'disabled':'';
+    const roInp=readonly?'readonly':'';
 
     return `<div class="req-item">
       <div class="req-item-row1">
@@ -2439,15 +2575,19 @@ function renderItemsEdit(readonly=false){
           <div class="req-item-nom">${nom}</div>
           ${desc?`<div class="req-item-desc">${desc}</div>`:''}
         </div>
-        <div class="req-item-input">
-          <span class="lab">ped</span>
-          <input type="number" step="0.001" min="0" value="${it.cantidad_pedida||''}" ${readonly?'readonly':''} oninput="updItem(${idx},'cantidad_pedida',this.value)">
-          <span class="unit">${undBase}</span>
+        <div class="req-item-pair req">
+          <span class="lab">PEDIDO</span>
+          <div class="inputs">
+            <input type="number" step="0.001" min="0" value="${it.cantidad_pedida||''}" ${roInp} oninput="updItem(${idx},'cantidad_pedida',this.value)" placeholder="0">
+            <select ${roAttr} onchange="updItem(${idx},'unidad',this.value)">${optsUnidades(it.unidad)}</select>
+          </div>
         </div>
-        <div class="req-item-input stk">
-          <span class="lab">stk</span>
-          <input type="number" step="0.001" min="0" value="${it.stock_actual!=null?it.stock_actual:''}" ${readonly?'readonly':''} oninput="updItem(${idx},'stock_actual',this.value)" placeholder="—">
-          <span class="unit">${undBase}</span>
+        <div class="req-item-pair stk">
+          <span class="lab">STOCK *</span>
+          <div class="inputs">
+            <input type="number" step="0.001" min="0" value="${it.stock_actual!=null?it.stock_actual:''}" ${roInp} oninput="updItem(${idx},'stock_actual',this.value)" placeholder="0">
+            <select ${roAttr} onchange="updItem(${idx},'unidad_stock',this.value)">${optsUnidades(it.unidad_stock||it.unidad)}</select>
+          </div>
         </div>
         ${acts}
       </div>
@@ -2457,9 +2597,8 @@ function renderItemsEdit(readonly=false){
       </div>
       <div class="req-dest-pop" id="destPop${idx}">${chipsPop}</div>
       <div class="req-com-row ${tieneCom?'open':''}" id="comRow${idx}">
-        <input type="text" placeholder="Comentario del pedido (opcional)" value="${(it.comentario_pedido||'').replace(/"/g,'&quot;')}" ${readonly?'readonly':''} oninput="updItem(${idx},'comentario_pedido',this.value)">
+        <input type="text" placeholder="Comentario del pedido (opcional)" value="${(it.comentario_pedido||'').replace(/"/g,'&quot;')}" ${roInp} oninput="updItem(${idx},'comentario_pedido',this.value)">
       </div>
-      ${costoHtml}
     </div>`;
   }).join('');
 }
@@ -2561,11 +2700,11 @@ function agregarItem(ingId){
   REQ_ITEMS_DRAFT.push({
     ingrediente_id:ing.id,
     cantidad_pedida:null,
-    unidad:ing.unidad,
-    stock_actual:null,
+    unidad:'',           // se elige al pedir
+    stock_actual:null,   // OBLIGATORIO (puede ser 0)
+    unidad_stock:'',     // se elige al cargar stock
     destinos:[],
     comentario_pedido:'',
-    costo_unitario_pedido:costoUnitario(ing),
     estado_recepcion:'pendiente',
     cantidad_recibida:null,
     comentario_recepcion:''
@@ -2576,15 +2715,31 @@ function agregarItem(ingId){
 window.agregarItem=agregarItem;
 
 // ---------- Guardar requerimiento (crear o actualizar) ----------
-async function guardarReq(){
+// Si esConfirmar=true, pasa el estado de 'borrador' a 'pendiente'
+async function guardarReq(esConfirmar=false){
   const local=document.getElementById('reqDetLocal').value;
   if(!local){toast('Falta el local');return;}
   if(!REQ_ITEMS_DRAFT.length){toast('Agregá al menos un ingrediente');return;}
-  // Validar que todos los items tengan cantidad
+
+  // Validación: todos los items deben tener cantidad, unidad, stock y unidad_stock
   for(const it of REQ_ITEMS_DRAFT){
+    const ing=INGS.find(x=>x.id===it.ingrediente_id);
+    const nomIng=ing?ing.nombre:'(ingrediente)';
     if(!it.cantidad_pedida||it.cantidad_pedida<=0){
-      const ing=INGS.find(x=>x.id===it.ingrediente_id);
-      toast(`Falta cantidad para "${ing?ing.nombre:'un ingrediente'}"`);
+      toast(`Falta cantidad pedida para "${nomIng}"`);
+      return;
+    }
+    if(!it.unidad){
+      toast(`Falta unidad de pedido para "${nomIng}"`);
+      return;
+    }
+    // Stock es OBLIGATORIO (puede ser 0)
+    if(it.stock_actual===null||it.stock_actual===''||it.stock_actual===undefined){
+      toast(`Falta stock para "${nomIng}" (puede ser 0)`);
+      return;
+    }
+    if(!it.unidad_stock){
+      toast(`Falta unidad del stock para "${nomIng}"`);
       return;
     }
   }
@@ -2599,20 +2754,24 @@ async function guardarReq(){
     actualizado_en:ahora
   };
 
+  // Si se está confirmando: pasar de borrador a pendiente
+  if(esConfirmar){
+    cabecera.estado='pendiente';
+  }
+
   let reqId=REQ_ED;
   if(reqId){
-    // Actualizar cabecera
     await api(`requerimientos?id=eq.${reqId}`,'PATCH',cabecera);
   } else {
-    // Crear nuevo
+    // Crear nuevo: arranca como borrador (a menos que se confirme directamente)
     cabecera.creado_por=CU.id;
-    cabecera.estado='pendiente';
+    if(!esConfirmar) cabecera.estado='borrador';
     const r=await api('requerimientos','POST',cabecera);
     if(!r||!r[0]){toast('⛔ No se pudo crear el pedido');return;}
     reqId=r[0].id;
   }
 
-  // Items: borrar los viejos y reinsertar (simplifica mucho la lógica)
+  // Items: borrar los viejos y reinsertar
   if(REQ_ED){
     await api(`requerimiento_items?requerimiento_id=eq.${reqId}`,'DELETE');
   }
@@ -2622,9 +2781,9 @@ async function guardarReq(){
     cantidad_pedida:it.cantidad_pedida,
     unidad:it.unidad,
     stock_actual:it.stock_actual,
+    unidad_stock:it.unidad_stock,
     destinos:it.destinos||[],
     comentario_pedido:it.comentario_pedido||null,
-    costo_unitario_pedido:it.costo_unitario_pedido,
     estado_recepcion:it.estado_recepcion||'pendiente',
     cantidad_recibida:it.cantidad_recibida,
     comentario_recepcion:it.comentario_recepcion||null,
@@ -2634,12 +2793,20 @@ async function guardarReq(){
     await api('requerimiento_items','POST',itemsBody);
   }
 
-  toast(REQ_ED?'✓ Pedido actualizado':'✓ Pedido creado');
+  toast(esConfirmar?'🚀 Pedido confirmado y enviado a Compras':(REQ_ED?'✓ Guardado':'✓ Pre-pedido creado'));
   closeOv('ovReq');
   await fetchReqs();
   renderReq();
+  renderRecepciones();
 }
 window.guardarReq=guardarReq;
+
+// Confirmar pedido: pasa de borrador a pendiente (lo envía a Compras)
+async function confirmarReq(){
+  if(!confirm('¿Confirmar el pedido y enviarlo a Compras? Una vez confirmado no vas a poder editarlo (solo Compras o Admin).'))return;
+  await guardarReq(true);
+}
+window.confirmarReq=confirmarReq;
 
 // ---------- Cancelar requerimiento ----------
 async function cancelarReq(){
@@ -2977,6 +3144,296 @@ loadReq=async function(){
   renderRecepciones(); // para refrescar el badge aunque no estés en esa pestaña
 };
 window.loadReq=loadReq;
+
+// ============================================================================
+// PESTAÑA STOCK — Recuentos de inventario
+// ============================================================================
+
+// Determinar qué local usa la pestaña Stock
+function stockLocalActivo(){
+  if(reqEsCompras()){
+    return document.getElementById('stockFiltroLocal')?.value||'';
+  }
+  return CU.local||'';
+}
+
+// Carga inicial de la pestaña Stock
+async function loadStockRecuentos(){
+  // Mostrar filtro de local solo para Compras/Admin
+  document.getElementById('stockFilterRow').style.display=reqEsCompras()?'flex':'none';
+
+  const local=stockLocalActivo();
+  const cont=document.getElementById('stockList');
+
+  if(!local){
+    cont.innerHTML=`<div class="req-empty">
+      <div class="req-empty-icon">📦</div>
+      <div class="req-empty-txt">Seleccioná un local arriba para ver los recuentos</div>
+    </div>`;
+    document.getElementById('stockBtnNuevo').style.display='none';
+    STOCK_RECUENTOS=[];
+    return;
+  }
+
+  document.getElementById('stockBtnNuevo').style.display='';
+
+  const data=await api(`stock_recuentos?select=*,stock_recuento_items(*)&activo=eq.true&local=eq.${encodeURIComponent(local)}&order=fecha.desc&limit=5`);
+  STOCK_RECUENTOS=data||[];
+
+  if(!STOCK_RECUENTOS.length){
+    cont.innerHTML=`<div class="req-empty">
+      <div class="req-empty-icon">📦</div>
+      <div class="req-empty-txt">No hay recuentos para ${reqNomLocal(local)}</div>
+      <div class="req-empty-sub">Tocá "+ Nuevo recuento" para hacer el primero</div>
+    </div>`;
+    return;
+  }
+
+  cont.innerHTML='<div class="req-list">'+STOCK_RECUENTOS.map(r=>{
+    const items=r.stock_recuento_items||[];
+    const fecha=new Date(r.fecha).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    return `<div class="req-card" onclick="abrirRecuento(${r.id})" style="border-left-color:#27AE60">
+      <div class="req-card-hdr">
+        <span class="req-card-id">Recuento #${r.id}</span>
+        <span class="req-badge req-b-completo">📦 ${items.length} ítems</span>
+      </div>
+      <div class="req-card-meta">
+        <strong>${reqNomLocal(r.local)}</strong><br>
+        📅 ${fecha}
+        ${r.observaciones?`<br>📝 ${r.observaciones}`:''}
+      </div>
+      <div class="req-card-foot">
+        <span>Tocá para ver el detalle</span>
+        <span style="font-size:14px">›</span>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+window.loadStockRecuentos=loadStockRecuentos;
+
+// Abrir un recuento existente (modo lectura)
+async function abrirRecuento(id){
+  const r=STOCK_RECUENTOS.find(x=>x.id===id);
+  if(!r){toast('Recuento no encontrado');return;}
+  STOCK_ED=id;
+  STOCK_ITEMS_DRAFT=(r.stock_recuento_items||[]).map(it=>({
+    id:it.id,
+    ingrediente_id:it.ingrediente_id,
+    cantidad:it.cantidad,
+    unidad:it.unidad,
+    comentario:it.comentario||''
+  }));
+
+  document.getElementById('stockTitulo').textContent=`Recuento #${r.id}`;
+  document.getElementById('stockDetLocal').value=reqNomLocal(r.local);
+  document.getElementById('stockDetFecha').value=new Date(r.fecha).toLocaleString('es-AR');
+  document.getElementById('stockDetObs').value=r.observaciones||'';
+  document.getElementById('stockDetObs').disabled=true;
+
+  // Botón guardar oculto (es solo lectura)
+  document.getElementById('stockBtnGuardar').style.display='none';
+  document.getElementById('stockBtnExport').style.display='';
+
+  renderStockItems(true);
+  openOv('ovStock');
+}
+window.abrirRecuento=abrirRecuento;
+
+// Nuevo recuento: trae los insumos pedidos en últimos 60 días
+async function openStockNuevo(){
+  const local=stockLocalActivo();
+  if(!local){toast('Seleccioná un local primero');return;}
+
+  STOCK_ED=null;
+  document.getElementById('stockTitulo').textContent='Nuevo recuento de stock';
+  document.getElementById('stockDetLocal').value=reqNomLocal(local);
+  document.getElementById('stockDetFecha').value=new Date().toLocaleString('es-AR');
+  document.getElementById('stockDetObs').value='';
+  document.getElementById('stockDetObs').disabled=false;
+
+  document.getElementById('stockBtnGuardar').style.display='';
+  document.getElementById('stockBtnExport').style.display='none';
+
+  // Calcular fecha de hace 60 días
+  const hace60=new Date();hace60.setDate(hace60.getDate()-60);
+  const fechaIso=hace60.toISOString();
+
+  // Traer todos los items pedidos en los últimos 60 días para este local
+  const data=await api(`requerimientos?select=local,fecha_creacion,estado,requerimiento_items(ingrediente_id,unidad)&activo=eq.true&local=eq.${encodeURIComponent(local)}&estado=neq.borrador&fecha_creacion=gte.${encodeURIComponent(fechaIso)}`);
+
+  // Construir lista única de ingredientes
+  const mapa=new Map(); // ingrediente_id -> unidad más usada
+  for(const r of (data||[])){
+    for(const it of (r.requerimiento_items||[])){
+      if(!mapa.has(it.ingrediente_id)){
+        mapa.set(it.ingrediente_id,it.unidad||'');
+      }
+    }
+  }
+
+  STOCK_ITEMS_DRAFT=Array.from(mapa.entries()).map(([ingId,und])=>({
+    ingrediente_id:ingId,
+    cantidad:0,
+    unidad:und||'',
+    comentario:''
+  }));
+
+  // Ordenar por nombre del ingrediente
+  STOCK_ITEMS_DRAFT.sort((a,b)=>{
+    const ia=INGS.find(x=>x.id===a.ingrediente_id);
+    const ib=INGS.find(x=>x.id===b.ingrediente_id);
+    return (ia?.nombre||'').localeCompare(ib?.nombre||'','es');
+  });
+
+  if(!STOCK_ITEMS_DRAFT.length){
+    toast('No hay insumos pedidos en los últimos 60 días para este local');
+    return;
+  }
+
+  renderStockItems(false);
+  openOv('ovStock');
+}
+window.openStockNuevo=openStockNuevo;
+
+// Render de items del recuento
+function renderStockItems(readonly=false){
+  const cont=document.getElementById('stockItems');
+  document.getElementById('stockItemsCount').textContent=STOCK_ITEMS_DRAFT.length?`(${STOCK_ITEMS_DRAFT.length})`:'';
+
+  if(!STOCK_ITEMS_DRAFT.length){
+    cont.innerHTML=`<div class="req-empty" style="padding:24px">
+      <div class="req-empty-txt" style="font-size:13px">Sin insumos para mostrar</div>
+    </div>`;
+    return;
+  }
+
+  cont.innerHTML=STOCK_ITEMS_DRAFT.map((it,idx)=>{
+    const ing=INGS.find(x=>x.id===it.ingrediente_id);
+    const nom=ing?ing.nombre:'(ingrediente)';
+    const desc=ing?[ing.formato,ing.proveedor].filter(Boolean).join(' · '):'';
+    const roInp=readonly?'readonly':'';
+    const roAttr=readonly?'disabled':'';
+
+    return `<div class="req-item">
+      <div class="req-item-row1">
+        <div class="req-item-info">
+          <div class="req-item-nom">${nom}</div>
+          ${desc?`<div class="req-item-desc">${desc}</div>`:''}
+        </div>
+        <div class="req-item-pair stk">
+          <span class="lab">STOCK</span>
+          <div class="inputs">
+            <input type="number" step="0.001" min="0" value="${it.cantidad!=null?it.cantidad:0}" ${roInp} oninput="updStockItem(${idx},'cantidad',this.value)" placeholder="0">
+            <select ${roAttr} onchange="updStockItem(${idx},'unidad',this.value)">${optsUnidades(it.unidad)}</select>
+          </div>
+        </div>
+      </div>
+      <div class="req-com-row open" style="margin-top:6px">
+        <input type="text" placeholder="Comentario (opcional)" value="${(it.comentario||'').replace(/"/g,'&quot;')}" ${roInp} oninput="updStockItem(${idx},'comentario',this.value)">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updStockItem(idx,campo,val){
+  if(!STOCK_ITEMS_DRAFT[idx])return;
+  if(campo==='cantidad'){
+    STOCK_ITEMS_DRAFT[idx][campo]=val===''?0:parseFloat(val);
+  } else {
+    STOCK_ITEMS_DRAFT[idx][campo]=val;
+  }
+}
+window.updStockItem=updStockItem;
+
+// Guardar recuento nuevo
+async function guardarRecuento(){
+  const local=stockLocalActivo();
+  if(!local){toast('Falta el local');return;}
+  if(!STOCK_ITEMS_DRAFT.length){toast('No hay items para guardar');return;}
+
+  // Validar que todos los items tengan unidad
+  for(const it of STOCK_ITEMS_DRAFT){
+    if(!it.unidad){
+      const ing=INGS.find(x=>x.id===it.ingrediente_id);
+      toast(`Falta unidad para "${ing?ing.nombre:'un insumo'}"`);
+      return;
+    }
+  }
+
+  const obs=document.getElementById('stockDetObs').value||null;
+  const cabecera={local,creado_por:CU.id,observaciones:obs};
+
+  const r=await api('stock_recuentos','POST',cabecera);
+  if(!r||!r[0]){toast('⛔ No se pudo guardar el recuento');return;}
+  const recId=r[0].id;
+
+  const itemsBody=STOCK_ITEMS_DRAFT.map((it,idx)=>({
+    recuento_id:recId,
+    ingrediente_id:it.ingrediente_id,
+    cantidad:it.cantidad||0,
+    unidad:it.unidad,
+    comentario:it.comentario||null,
+    orden:idx
+  }));
+  await api('stock_recuento_items','POST',itemsBody);
+
+  // Limpiar recuentos viejos (mantener solo los últimos 5)
+  await api('rpc/limpiar_recuentos_viejos','POST',{local_slug:local});
+
+  toast('✓ Recuento guardado');
+  closeOv('ovStock');
+  loadStockRecuentos();
+}
+window.guardarRecuento=guardarRecuento;
+
+// Exportar el recuento abierto a Excel (CSV en realidad, que Excel abre nativo)
+function exportarRecuentoExcel(){
+  if(!STOCK_ITEMS_DRAFT.length){toast('Nada para exportar');return;}
+
+  const local=document.getElementById('stockDetLocal').value;
+  const fecha=document.getElementById('stockDetFecha').value;
+  const obs=document.getElementById('stockDetObs').value;
+
+  // BOM para que Excel detecte UTF-8 correctamente con acentos
+  let csv='\uFEFF';
+  csv+=`Recuento de Stock\n`;
+  csv+=`Local;${local}\n`;
+  csv+=`Fecha;${fecha}\n`;
+  if(obs) csv+=`Observaciones;${obs.replace(/[\r\n;]/g,' ')}\n`;
+  csv+=`\n`;
+  csv+=`Ingrediente;Formato;Proveedor;Cantidad;Unidad;Comentario\n`;
+
+  for(const it of STOCK_ITEMS_DRAFT){
+    const ing=INGS.find(x=>x.id===it.ingrediente_id);
+    const nom=(ing?.nombre||'').replace(/;/g,',');
+    const fmt=(ing?.formato||'').replace(/;/g,',');
+    const prov=(ing?.proveedor||'').replace(/;/g,',');
+    const com=(it.comentario||'').replace(/[\r\n;]/g,' ');
+    csv+=`${nom};${fmt};${prov};${it.cantidad||0};${nomUnidad(it.unidad)};${com}\n`;
+  }
+
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const safeLocal=local.toLowerCase().replace(/[^a-z0-9]/g,'_');
+  const today=new Date().toISOString().slice(0,10);
+  a.download=`recuento_stock_${safeLocal}_${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✓ Archivo descargado');
+}
+window.exportarRecuentoExcel=exportarRecuentoExcel;
+
+// Hook en switchReqPane para cargar Stock cuando se entra a esa pestaña
+const _origSwitchReqPane=switchReqPane;
+switchReqPane=function(pane){
+  _origSwitchReqPane(pane);
+  if(pane==='req-stock') loadStockRecuentos();
+};
+window.switchReqPane=switchReqPane;
 
 // ============================================================================
 // FIN MÓDULO REQUERIMIENTOS
