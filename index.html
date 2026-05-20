@@ -82,9 +82,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .tbl .price{font-weight:600;color:var(--olive)}
 .overlay{display:none;position:fixed;inset:0;background:rgba(28,26,23,.6);z-index:200;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
 .overlay.open{display:flex}
-.modal{background:var(--white);border-radius:16px;width:100%;max-width:660px;padding:30px;position:relative}
+.modal{background:var(--white);border-radius:16px;width:100%;max-width:660px;padding:30px;position:relative;box-sizing:border-box;overflow-x:hidden}
 .modal.wide{max-width:820px}
 .modal h2{font-family:'Playfair Display',serif;font-size:21px;margin-bottom:18px}
+.modal *{box-sizing:border-box;max-width:100%}
 .mc{position:absolute;top:18px;right:18px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 .fg{display:flex;flex-direction:column;gap:4px}
@@ -101,6 +102,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .ctbl td{padding:4px 7px;vertical-align:middle}
 .ctbl input,.ctbl select{padding:5px 8px;font-size:12px;width:100%;border:1px solid var(--sand);border-radius:6px;background:var(--cream);font-family:'DM Sans',sans-serif;outline:none}
 .ctbl input:focus,.ctbl select:focus{border-color:var(--olive);background:var(--white)}
+.cs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cs .ctbl{min-width:560px}
 .cprev{background:var(--cream);border-radius:10px;padding:14px 18px;margin-top:14px;display:flex;gap:20px;flex-wrap:wrap}
 .ci .val{font-size:19px;font-weight:700;color:var(--olive)}.ci .lbl{font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
 .mpl{list-style:none;margin-bottom:12px}
@@ -142,7 +145,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 /* Info box para unidad base en modal ingrediente */
 .ing-unidad-info{background:#E8F0E0;border:1px solid #c0d4a0;border-radius:8px;padding:10px 14px;margin-top:4px;font-size:12px;color:var(--olive);line-height:1.5}
 .ing-unidad-info strong{color:var(--dark)}
-@media(max-width:700px){
+@media(max-width:900px){
   /* Layout */
   .dash-grid,.frow,.dg{grid-template-columns:1fr}
   .cards-grid{grid-template-columns:1fr}
@@ -246,17 +249,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .req-b-completoobs{background:#FFF8E1;color:#B7791F}
 .req-b-cancelado{background:#F5F5F5;color:#757575}
 
-/* Combo cantidad + unidad para items */
-.req-item-pair{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:96px}
-.req-item-pair .lab{font-size:9px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;color:var(--gray);line-height:1;text-align:center}
-.req-item-pair .inputs{display:flex;gap:3px}
-.req-item-pair input{width:42px;padding:5px 4px;font-size:12px;border:1px solid var(--sand);border-radius:5px;text-align:right;outline:none;font-family:inherit;color:var(--dark);background:var(--white)}
-.req-item-pair input:focus{border-color:var(--olive)}
-.req-item-pair select{flex:1;padding:5px 4px;font-size:11px;border:1px solid var(--sand);border-radius:5px;outline:none;font-family:inherit;color:var(--dark);background:var(--white);min-width:60px}
-.req-item-pair select:focus{border-color:var(--olive)}
-.req-item-pair.stk input,.req-item-pair.stk select{background:var(--cream)}
-.req-item-pair.req input:invalid,.req-item-pair.req select:invalid{border-color:#E67E22}
-
 .req-empty{text-align:center;padding:48px 20px;color:var(--gray);background:var(--white);border-radius:12px;border:2px dashed var(--sand-l)}
 .req-empty-icon{font-size:48px;margin-bottom:12px;opacity:0.5}
 .req-empty-txt{font-size:14px;margin-bottom:4px}
@@ -274,25 +266,32 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
 /* Items del requerimiento - VERSION COMPACTA */
 .req-items{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
-.req-item{background:var(--white);border:1px solid var(--sand-l);border-radius:8px;padding:8px 10px}
-.req-item-row1{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.req-item{background:var(--white);border:1px solid var(--sand-l);border-radius:8px;padding:10px}
+
+/* Fila 1: nombre + descripción a la izquierda; acciones a la derecha */
+.req-item-row1{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}
 .req-item-info{flex:1;min-width:0}
-.req-item-nom{font-size:13px;font-weight:600;color:var(--dark);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.req-item-desc{font-size:10px;color:var(--gray);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
-.req-item-input{display:flex;flex-direction:column;align-items:center;gap:1px}
-.req-item-input input{width:48px;padding:5px 6px;font-size:12px;border:1px solid var(--sand);border-radius:6px;text-align:right;outline:none;font-family:inherit;color:var(--dark);background:var(--white)}
-.req-item-input input:focus{border-color:var(--olive)}
-.req-item-input.stk input{background:var(--cream)}
-.req-item-input .lab{font-size:9px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;color:var(--gray);line-height:1}
-.req-item-input .unit{font-size:9px;color:var(--gray);line-height:1;margin-top:1px}
-.req-item-acts{display:flex;align-items:center;gap:4px;align-self:flex-start;margin-top:2px}
+.req-item-nom{font-size:13px;font-weight:600;color:var(--dark);line-height:1.3;word-break:break-word}
+.req-item-desc{font-size:10px;color:var(--gray);line-height:1.2;margin-top:2px;word-break:break-word}
+.req-item-acts{display:flex;align-items:center;gap:2px;flex-shrink:0}
 .req-item-com-btn{background:transparent;border:none;cursor:pointer;padding:3px;font-size:14px;line-height:1;color:var(--gray)}
 .req-item-com-btn.active{color:var(--blue)}
 .req-item-del{background:transparent;border:none;color:var(--gray);font-size:13px;cursor:pointer;padding:3px;line-height:1}
 .req-item-del:hover{color:var(--red)}
 
+/* Fila 2: PEDIDO + STOCK en grilla de dos columnas */
+.req-item-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.req-item-pair{display:flex;flex-direction:column;gap:3px;min-width:0}
+.req-item-pair .lab{font-size:9px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;color:var(--gray);line-height:1}
+.req-item-pair .inputs{display:flex;gap:3px;align-items:stretch}
+.req-item-pair input{width:46px;padding:5px 4px;font-size:12px;border:1px solid var(--sand);border-radius:5px;text-align:right;outline:none;font-family:inherit;color:var(--dark);background:var(--white);flex-shrink:0;min-width:0}
+.req-item-pair input:focus{border-color:var(--olive)}
+.req-item-pair select{flex:1;min-width:0;padding:5px 4px;font-size:11px;border:1px solid var(--sand);border-radius:5px;outline:none;font-family:inherit;color:var(--dark);background:var(--white)}
+.req-item-pair select:focus{border-color:var(--olive)}
+.req-item-pair.stk input,.req-item-pair.stk select{background:var(--cream)}
+
 /* Chips de destinos - fila inferior compacta */
-.req-item-chips{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.req-item-chips{display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:2px}
 .req-chip-mini{font-size:10px;padding:2px 7px;border-radius:9px;border:1px solid var(--sand);background:var(--white);color:var(--gray);cursor:pointer;font-family:inherit;font-weight:500;user-select:none;line-height:1.3}
 .req-chip-mini:hover{border-color:var(--olive-l)}
 .req-chip-mini.sel{background:var(--olive);border-color:var(--olive);color:var(--white)}
@@ -309,7 +308,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .req-com-row input{width:100%;padding:6px 8px;border:1px solid var(--sand-l);border-radius:6px;font-size:11px;font-family:inherit;color:var(--dark);outline:none;background:var(--cream)}
 .req-com-row input:focus{border-color:var(--olive);background:var(--white)}
 
-/* Costos histórico vs actual */
+/* Costos histórico vs actual (legado, podría no aparecer ya) */
 .req-costo{display:flex;gap:6px;font-size:10px;color:var(--gray);margin-top:5px;padding-top:5px;border-top:1px dashed var(--sand-l);flex-wrap:wrap}
 .req-costo .now{color:var(--olive);font-weight:600}
 .req-costo .diff-up{color:var(--red);font-weight:600}
@@ -340,7 +339,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   .req-detail-grid{grid-template-columns:1fr}
   .req-acciones{flex-direction:column}
   .req-acciones .btn{width:100%}
-  .req-item-input input{width:42px;font-size:11px}
+  .req-item-pair input{width:40px;font-size:11px}
+  .req-item-pair select{font-size:10px}
   .req-item-nom{font-size:12px}
 }
 
@@ -2575,7 +2575,10 @@ function renderItemsEdit(readonly=false){
           <div class="req-item-nom">${nom}</div>
           ${desc?`<div class="req-item-desc">${desc}</div>`:''}
         </div>
-        <div class="req-item-pair req">
+        ${acts}
+      </div>
+      <div class="req-item-row2">
+        <div class="req-item-pair">
           <span class="lab">PEDIDO</span>
           <div class="inputs">
             <input type="number" step="0.001" min="0" value="${it.cantidad_pedida||''}" ${roInp} oninput="updItem(${idx},'cantidad_pedida',this.value)" placeholder="0">
@@ -2589,7 +2592,6 @@ function renderItemsEdit(readonly=false){
             <select ${roAttr} onchange="updItem(${idx},'unidad_stock',this.value)">${optsUnidades(it.unidad_stock||it.unidad)}</select>
           </div>
         </div>
-        ${acts}
       </div>
       <div class="req-item-chips">
         ${chipsSel}
@@ -3320,7 +3322,9 @@ function renderStockItems(readonly=false){
           <div class="req-item-nom">${nom}</div>
           ${desc?`<div class="req-item-desc">${desc}</div>`:''}
         </div>
-        <div class="req-item-pair stk">
+      </div>
+      <div class="req-item-row2">
+        <div class="req-item-pair stk" style="grid-column:1 / -1">
           <span class="lab">STOCK</span>
           <div class="inputs">
             <input type="number" step="0.001" min="0" value="${it.cantidad!=null?it.cantidad:0}" ${roInp} oninput="updStockItem(${idx},'cantidad',this.value)" placeholder="0">
