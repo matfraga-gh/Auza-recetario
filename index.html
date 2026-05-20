@@ -1500,11 +1500,15 @@ function verR(id){
     if(cp.tipo_componente==='ingrediente'){
       const i=INGS.find(x=>x.id===cp.ingrediente_id);
       nom=i?`${i.nombre}${i.formato?` <small style="color:var(--gray)">(${i.formato})</small>`:''}` :'?';
-      lc=costoUnitario(i)*cp.cantidad;
+      // BUG FIX: usar costoConversion para que respete las unidades (ej: receta en g, costo por kg)
+      lc=costoConversion(i,cp.cantidad,cp.unidad);
     } else {
       const s=RECS.find(x=>x.id===cp.sub_receta_id);
       nom=s?`<span class="nb">sub-receta</span> ${s.nombre}`:'?';
-      lc=costo(s)*cp.cantidad;
+      // Lo mismo para sub-recetas: convertir si la unidad del componente difiere de la unidad de rendimiento
+      const undBase=s?s.unidad_rendimiento||'porcion':'porcion';
+      const cantConv=convertir(cp.cantidad,cp.unidad||undBase,undBase)??cp.cantidad;
+      lc=s?costo(s)*cantConv:0;
     }
     return `<li><span>${cp.grupo?`<small style="color:var(--gray)">${cp.grupo} · </small>`:''}${nom} <small style="color:var(--gray)">${cp.cantidad} ${cp.unidad}</small></span><span class="ic">${fmt(lc)}</span></li>`;
   }).join('');
