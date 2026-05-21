@@ -1052,15 +1052,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     </div>
     <div class="frow">
       <div class="fg"><label>Estado</label><select id="uAct"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
-      <div class="fg"><label>Local asignado</label>
-        <select id="uLocal">
-          <option value="todos">🌐 Todos (transversal)</option>
-          <option value="azafran">Azafrán</option>
-          <option value="trapiche">Espacio Trapiche</option>
-          <option value="nieto">Nieto Senetiner</option>
-          <option value="vinobien">Vinobien</option>
-          <option value="cobos">Viña Cobos</option>
-        </select>
+      <div class="fg"><label>Locales asignados (1 o más)</label>
+        <div id="uLocalesBox" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1.5px solid var(--sand);border-radius:8px;background:var(--white)">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" class="ulocal-cb" value="azafran"> Azafrán</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" class="ulocal-cb" value="trapiche"> Espacio Trapiche</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" class="ulocal-cb" value="nieto"> Nieto Senetiner</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" class="ulocal-cb" value="vinobien"> Vinobien</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" class="ulocal-cb" value="cobos"> Viña Cobos</label>
+        </div>
+        <div style="font-size:11px;color:var(--gray);margin-top:4px">Cocina puede tener 1 o más locales. Compras y Admin pueden dejarlo vacío (ven todo).</div>
       </div>
     </div>
     <div class="ma">
@@ -2139,19 +2139,26 @@ window.delLocal=delLocal;
 
 async function loadUsers(){
   USERS=await api('usuarios?select=*&order=rol.asc,nombre.asc')||[];
-  const localesNom={todos:'🌐 Todos',azafran:'Azafrán',trapiche:'Espacio Trapiche',nieto:'Nieto Senetiner',vinobien:'Vinobien',cobos:'Viña Cobos'};
+  const localesNom={azafran:'Azafrán',trapiche:'Trapiche',nieto:'Nieto',vinobien:'Vinobien',cobos:'Cobos'};
   document.getElementById('usersTbody').innerHTML=USERS.map(u=>{
-    const localTxt=localesNom[u.local]||u.local||'—';
-    // Resaltar cocina sin local específico (inconsistencia)
-    const alerta=(u.rol==='cocina'&&(u.local==='todos'||!u.local))?'<span style="color:#C0392B;font-size:11px;margin-left:4px" title="Cocina sin local: no podrá hacer pedidos correctamente">⚠</span>':'';
-    return `<tr><td><strong>${u.nombre}</strong></td><td>@${u.usuario}</td><td>${RL[u.rol]||u.rol}</td><td>${localTxt}${alerta}</td><td><span class="badge ${u.activo?'bg':'bgr'}">${u.activo?'Activo':'Inactivo'}</span></td><td style="display:flex;gap:4px">${u.id!==CU.id?`<button class="bsm" onclick="editUser(${u.id})">✏️</button><button class="bd" onclick="delUser(${u.id})">🗑</button>`:'<span style="color:var(--gray);font-size:11px">tu cuenta</span>'}</td></tr>`;
+    const localesUsr=Array.isArray(u.locales)?u.locales:(u.local&&u.local!=='todos'?[u.local]:[]);
+    let localTxt;
+    if(!localesUsr.length){
+      localTxt=u.rol==='cocina'?'<span style="color:#C0392B;font-weight:600">⚠ Sin local</span>':'<span style="color:var(--gray)">— (ve todos)</span>';
+    } else {
+      localTxt=localesUsr.map(l=>`<span style="display:inline-block;font-size:11px;background:var(--sand-l);color:var(--dark);padding:2px 7px;border-radius:6px;margin-right:3px;margin-bottom:2px">${localesNom[l]||l}</span>`).join('');
+    }
+    return `<tr><td><strong>${u.nombre}</strong></td><td>@${u.usuario}</td><td>${RL[u.rol]||u.rol}</td><td>${localTxt}</td><td><span class="badge ${u.activo?'bg':'bgr'}">${u.activo?'Activo':'Inactivo'}</span></td><td style="display:flex;gap:4px">${u.id!==CU.id?`<button class="bsm" onclick="editUser(${u.id})">✏️</button><button class="bd" onclick="delUser(${u.id})">🗑</button>`:'<span style="color:var(--gray);font-size:11px">tu cuenta</span>'}</td></tr>`;
   }).join('');
 }
 
 function openUserModal(){
   eUser=null;document.getElementById('uTitle').textContent='Nuevo Usuario';
   ['uNom','uUser','uPass'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('uRol').value='cocina';document.getElementById('uLocal').value='todos';document.getElementById('uAct').value='true';
+  document.getElementById('uRol').value='cocina';
+  // Desmarcar todos los checkboxes de locales
+  document.querySelectorAll('.ulocal-cb').forEach(cb=>cb.checked=false);
+  document.getElementById('uAct').value='true';
   openOv('ovU');
 }
 window.openUserModal=openUserModal;
@@ -2161,7 +2168,13 @@ function editUser(id){
   document.getElementById('uTitle').textContent='Editar Usuario';
   document.getElementById('uNom').value=u.nombre||'';document.getElementById('uUser').value=u.usuario||'';
   document.getElementById('uPass').value='';document.getElementById('uPass').placeholder='Dejar vacío para no cambiar';
-  document.getElementById('uRol').value=u.rol||'cocina';document.getElementById('uLocal').value=u.local||'todos';document.getElementById('uAct').value=u.activo?'true':'false';
+  document.getElementById('uRol').value=u.rol||'cocina';
+  // Marcar los checkboxes correspondientes
+  const localesUsr=Array.isArray(u.locales)?u.locales:[];
+  document.querySelectorAll('.ulocal-cb').forEach(cb=>{
+    cb.checked=localesUsr.includes(cb.value);
+  });
+  document.getElementById('uAct').value=u.activo?'true':'false';
   openOv('ovU');
 }
 window.editUser=editUser;
@@ -2169,12 +2182,24 @@ window.editUser=editUser;
 async function saveUser(){
   const nom=document.getElementById('uNom').value.trim();const usr=document.getElementById('uUser').value.trim().toLowerCase();const pass=document.getElementById('uPass').value;const rol=document.getElementById('uRol').value;
   if(!nom||!usr||!rol){toast('Completá todos los campos');return;}
-  const localElegido=document.getElementById('uLocal').value;
-  // Aviso: Cocina con local "todos" no tiene sentido (no podrá pedir para nadie)
-  if(rol==='cocina'&&localElegido==='todos'){
-    if(!confirm('⚠️ Estás guardando un usuario de COCINA sin local específico.\n\nLos usuarios de Cocina deberían tener un local asignado (Azafrán, Trapiche, etc.) para poder hacer pedidos.\n\n¿Guardar igual?')) return;
+  // Leer los checkboxes de locales
+  const localesElegidos=[];
+  document.querySelectorAll('.ulocal-cb').forEach(cb=>{
+    if(cb.checked) localesElegidos.push(cb.value);
+  });
+  // Validación: Cocina debe tener al menos un local
+  if(rol==='cocina'&&localesElegidos.length===0){
+    toast('⚠️ Cocina debe tener al menos un local asignado');return;
   }
-  const body={nombre:nom,usuario:usr,rol,local:localElegido,activo:document.getElementById('uAct').value==='true'};
+  // Guardar: locales como array, y mantener 'local' por compatibilidad (primer local o "todos")
+  const body={
+    nombre:nom,
+    usuario:usr,
+    rol,
+    locales:localesElegidos,
+    local:localesElegidos.length===1?localesElegidos[0]:(localesElegidos.length===0?'todos':localesElegidos[0]),
+    activo:document.getElementById('uAct').value==='true'
+  };
   if(eUser){if(pass){if(pass.length<6){toast('Mínimo 6 caracteres');return;}body.password_hash=await sha256(pass);}await api(`usuarios?id=eq.${eUser}`,'PATCH',body);toast('Actualizado ✓');}
   else{if(!pass||pass.length<6){toast('Contraseña: mínimo 6 caracteres');return;}body.password_hash=await sha256(pass);await api('usuarios','POST',body);toast('Usuario creado ✓');}
   closeOv('ovU');await loadUsers();
@@ -2242,11 +2267,28 @@ const REQ_DESTINOS=[
 // ---------- Permisos ----------
 function reqEsAdmin(){return CU&&CU.rol==='admin';}
 function reqEsCompras(){return CU&&(CU.rol==='compras'||CU.rol==='admin');}
-// "Local del usuario": si tiene un local específico, lo devuelve. Si es admin o compras, null (ve todos).
-function reqLocalDelUsuario(){
+// Devuelve un ARRAY de slugs de los locales del usuario, o null si es Compras/Admin (ve todos)
+function reqLocalesDelUsuario(){
   if(!CU)return null;
   if(reqEsCompras())return null; // ve todos
-  return CU.local||null;
+  // Preferir el array nuevo `locales`, con fallback a `local` viejo
+  if(Array.isArray(CU.locales)&&CU.locales.length>0) return CU.locales.slice();
+  if(CU.local&&CU.local!=='todos') return [CU.local];
+  return []; // usuario cocina sin locales (caso degradado)
+}
+
+// Compatibilidad hacia atrás: si en algún lado se necesita un único local, devuelve el primero
+function reqLocalDelUsuario(){
+  const arr=reqLocalesDelUsuario();
+  if(arr===null) return null;
+  return arr[0]||null;
+}
+
+// ¿El local `slug` pertenece al usuario activo? (true para Compras/Admin siempre)
+function reqEsMiLocal(slug){
+  if(reqEsCompras()) return true;
+  const arr=reqLocalesDelUsuario();
+  return Array.isArray(arr)&&arr.includes(slug);
 }
 
 // ---------- Carga inicial de la vista ----------
@@ -2280,7 +2322,14 @@ async function loadReq(){
   const sub=document.getElementById('reqSubtitle');
   if(reqEsAdmin()) sub.textContent='Pedidos de insumos y su seguimiento. Como Admin podés ver y editar todos.';
   else if(reqEsCompras()) sub.textContent='Pedidos de insumos. Como Compras revisás y comprometés fechas.';
-  else sub.textContent=`Pedidos de insumos para tu local. Creá pre-pedidos y editalos antes de confirmar.`;
+  else {
+    const locales=reqLocalesDelUsuario();
+    if(locales&&locales.length>1){
+      sub.textContent=`Pedidos de insumos para tus ${locales.length} locales asignados. Creá pre-pedidos y elegí el local al pedir.`;
+    } else {
+      sub.textContent='Pedidos de insumos para tu local. Creá pre-pedidos y editalos antes de confirmar.';
+    }
+  }
 
   // Default tab según rol: Cocina arranca en Pre-pedidos, Compras/Admin en Pendientes
   if(!reqEsCompras()){
@@ -2297,10 +2346,19 @@ async function loadReq(){
 // ---------- Trae los requerimientos desde Supabase ----------
 async function fetchReqs(){
   let q='requerimientos?select=*,requerimiento_items(*)&activo=eq.true&order=fecha_creacion.desc';
-  const localUsuario=reqLocalDelUsuario();
-  if(localUsuario){
-    // Cocina/local: solo los suyos (incluye sus borradores)
-    q+=`&local=eq.${encodeURIComponent(localUsuario)}`;
+  const localesUsuario=reqLocalesDelUsuario();
+  if(localesUsuario){
+    // Cocina: solo los pedidos de SUS locales (puede ser 1 o varios)
+    if(localesUsuario.length===0){
+      // Cocina sin locales asignados: no debería ver nada
+      REQS=[];return;
+    } else if(localesUsuario.length===1){
+      q+=`&local=eq.${encodeURIComponent(localesUsuario[0])}`;
+    } else {
+      // Más de un local: usar `in.(...)` de PostgREST
+      const lst=localesUsuario.map(l=>encodeURIComponent(l)).join(',');
+      q+=`&local=in.(${lst})`;
+    }
   } else if(reqEsCompras()&&!reqEsAdmin()){
     // Compras (no admin): NO ve borradores ajenos
     q+=`&estado=neq.borrador`;
@@ -2461,19 +2519,36 @@ function openReqNuevo(){
   document.getElementById('reqDetFechaDeseada').value='';
   document.getElementById('reqDetFechaComp').value='';
 
-  // Local por defecto: el del usuario si tiene un local específico asignado, sino el primero del select
-  const localUsuario=CU.local;
+  // Local por defecto y permisos según locales del usuario
+  const localesUsuario=reqLocalesDelUsuario(); // null=Compras/Admin (ve todos); [] o array=Cocina
   const selLocal=document.getElementById('reqDetLocal');
-  if(localUsuario&&['azafran','trapiche','nieto','vinobien','cobos'].includes(localUsuario)){
-    selLocal.value=localUsuario;
-  } else {
-    // Usuario sin local específico (típicamente Compras/Admin): dejar el primero como default
-    // pero NO bloqueado para que pueda elegir cualquier local
+
+  if(localesUsuario===null){
+    // Compras/Admin: puede elegir cualquier local
     selLocal.selectedIndex=0;
+    selLocal.disabled=false;
+    // Mostrar todas las opciones
+    Array.from(selLocal.options).forEach(o=>{o.disabled=false;o.hidden=false;});
+  } else if(localesUsuario.length===0){
+    // Cocina sin locales: no puede crear pedidos
+    toast('⚠ No tenés locales asignados. Pedí a un Admin que te los configure.');
+    closeOv('ovReq');
+    return;
+  } else if(localesUsuario.length===1){
+    // Cocina con 1 solo local: lo fijamos y bloqueamos
+    selLocal.value=localesUsuario[0];
+    selLocal.disabled=true;
+  } else {
+    // Cocina con varios locales: dropdown habilitado SOLO con sus locales
+    Array.from(selLocal.options).forEach(o=>{
+      const esSuyo=localesUsuario.includes(o.value);
+      o.disabled=!esSuyo;
+      o.hidden=!esSuyo;
+    });
+    // Default al primer local del usuario
+    selLocal.value=localesUsuario[0];
+    selLocal.disabled=false;
   }
-  // Cocina (usuario con local específico) no puede cambiar el local del pedido
-  // Compras y Admin sí pueden elegir cualquier local
-  selLocal.disabled=reqLocalDelUsuario()!==null && !reqEsCompras();
 
   // En un pre-pedido nuevo, Cocina NO puede tocar fecha estimada (es de Compras)
   document.getElementById('reqDetFechaDeseada').disabled=false;
@@ -2519,7 +2594,7 @@ async function abrirReq(id){
   document.getElementById('reqDetObs').value=r.observaciones_generales||'';
 
   // ===== PERMISOS ESTRICTOS =====
-  const esMiLocal=reqEsCompras()||(CU.local===r.local);
+  const esMiLocal=reqEsMiLocal(r.local);
   const esBorrador=(r.estado==='borrador');
   const esPendiente=(r.estado==='pendiente');
   const esCompletado=(r.estado==='completado');
@@ -3027,8 +3102,8 @@ function abrirRecepcion(id){
   const r=REQS.find(x=>x.id===id);
   if(!r){toast('Pedido no encontrado');return;}
 
-  // Permiso: solo Compras/Admin o gente del local que recibe
-  const puede=reqEsCompras()||(CU.local===r.local);
+  // Permiso: solo Compras/Admin o gente que tenga ese local asignado
+  const puede=reqEsMiLocal(r.local);
   if(!puede){toast('⛔ No podés marcar recepción de otro local');return;}
 
   REC_ED=id;
@@ -3194,16 +3269,46 @@ window.loadReq=loadReq;
 
 // Determinar qué local usa la pestaña Stock
 function stockLocalActivo(){
-  if(reqEsCompras()){
-    return document.getElementById('stockFiltroLocal')?.value||'';
+  // Si hay un selector visible (Compras/Admin o Cocina con varios locales), usar su valor
+  const selector=document.getElementById('stockFiltroLocal');
+  if(selector&&!selector.closest('[style*="display:none"]')&&selector.offsetParent!==null){
+    return selector.value||'';
   }
-  return CU.local||'';
+  // Si es Cocina con 1 solo local, devolver ese
+  const locales=reqLocalesDelUsuario();
+  if(locales&&locales.length===1) return locales[0];
+  return selector?.value||'';
 }
 
 // Carga inicial de la pestaña Stock
 async function loadStockRecuentos(){
-  // Mostrar filtro de local solo para Compras/Admin
-  document.getElementById('stockFilterRow').style.display=reqEsCompras()?'flex':'none';
+  const localesUsuario=reqLocalesDelUsuario();
+  const filterRow=document.getElementById('stockFilterRow');
+  const selector=document.getElementById('stockFiltroLocal');
+
+  // Configurar el selector de local según el tipo de usuario
+  if(reqEsCompras()){
+    // Compras/Admin: ve todos los locales
+    filterRow.style.display='flex';
+    // Asegurar que estén todas las opciones visibles
+    Array.from(selector.options).forEach(o=>{o.hidden=false;o.disabled=false;});
+  } else if(localesUsuario&&localesUsuario.length>1){
+    // Cocina con varios locales: mostrar selector solo con SUS locales
+    filterRow.style.display='flex';
+    Array.from(selector.options).forEach(o=>{
+      if(o.value===''){o.hidden=false;return;}
+      const esSuyo=localesUsuario.includes(o.value);
+      o.hidden=!esSuyo;
+      o.disabled=!esSuyo;
+    });
+    // Default al primero del usuario si no hay nada seleccionado
+    if(!selector.value||!localesUsuario.includes(selector.value)){
+      selector.value=localesUsuario[0];
+    }
+  } else {
+    // Cocina con 1 solo local (o sin locales): ocultar selector
+    filterRow.style.display='none';
+  }
 
   const local=stockLocalActivo();
   const cont=document.getElementById('stockList');
@@ -3211,7 +3316,7 @@ async function loadStockRecuentos(){
   if(!local){
     cont.innerHTML=`<div class="req-empty">
       <div class="req-empty-icon">📦</div>
-      <div class="req-empty-txt">Seleccioná un local arriba para ver los recuentos</div>
+      <div class="req-empty-txt">${reqEsCompras()?'Seleccioná un local arriba para ver los recuentos':'No tenés locales asignados'}</div>
     </div>`;
     document.getElementById('stockBtnNuevo').style.display='none';
     STOCK_RECUENTOS=[];
@@ -3219,7 +3324,6 @@ async function loadStockRecuentos(){
   }
 
   document.getElementById('stockBtnNuevo').style.display='';
-
   const data=await api(`stock_recuentos?select=*,stock_recuento_items(*)&activo=eq.true&local=eq.${encodeURIComponent(local)}&order=fecha.desc&limit=5`);
   STOCK_RECUENTOS=data||[];
 
