@@ -142,7 +142,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .toast.show{opacity:1}
 .empty{text-align:center;padding:40px;color:var(--gray)}
 .empty .icon{font-size:44px;margin-bottom:10px}
-/* Info box para unidad base en modal ingrediente */
+/* Info box para unidad base en modal insumo */
 .ing-unidad-info{background:#E8F0E0;border:1px solid #c0d4a0;border-radius:8px;padding:10px 14px;margin-top:4px;font-size:12px;color:var(--olive);line-height:1.5}
 .ing-unidad-info strong{color:var(--dark)}
 @media(max-width:900px){
@@ -314,11 +314,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .req-costo .diff-up{color:var(--red);font-weight:600}
 .req-costo .diff-dn{color:var(--green);font-weight:600}
 
-/* Botón agregar ingrediente */
+/* Botón agregar insumo */
 .req-add{width:100%;padding:12px;background:transparent;color:var(--olive);border:1.5px dashed var(--olive-l);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
 .req-add:hover{background:var(--sand-l)}
 
-/* Modal seleccionar ingrediente */
+/* Modal seleccionar insumo */
 .req-ing-search{width:100%;padding:11px 14px;border:1.5px solid var(--sand);border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;outline:none}
 .req-ing-search:focus{border-color:var(--olive)}
 .req-ing-list{max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
@@ -459,7 +459,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   </div>
   <div class="content">
     <div class="ptitle">Platos &amp; Pasos de menú</div>
-    <div class="psub">Armá cada plato combinando sub-elaboraciones e ingredientes directos. El sistema calcula el costo automáticamente.</div>
+    <div class="psub">Armá cada plato combinando sub-elaboraciones e insumos directos. El sistema calcula el costo automáticamente.</div>
     <div class="toolbar">
       <input type="text" id="platoSearch" placeholder="Buscar..." oninput="renderPlatos()">
       <select id="platoCat" onchange="renderPlatos()">
@@ -505,7 +505,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
 <div id="vIng" class="view">
   <div class="app-hdr">
-    <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Ingredientes</div></div>
+    <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Insumos</div></div>
     <div class="app-btns">
       <button class="abtn ao" onclick="openIngModal()">+ Nuevo</button>
       <button class="abtn as" onclick="showView('vImport')">↑ Importar CSV</button>
@@ -513,10 +513,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     </div>
   </div>
   <div class="content">
-    <div class="ptitle">Ingredientes &amp; Costos</div>
-    <div class="psub">Solo Compras puede cargar y validar ingredientes. Cocina solo puede usar los validados.</div>
+    <div class="ptitle">Insumos &amp; Costos</div>
+    <div class="psub">Solo Compras puede cargar y validar insumos. Cocina solo puede usar los validados.</div>
     <div class="toolbar">
-      <input type="text" id="ingSearch" placeholder="Buscar ingrediente o proveedor..." oninput="debounceBuscar()" style="width:260px">
+      <input type="text" id="ingSearch" placeholder="Buscar insumo o proveedor..." oninput="debounceBuscar()" style="width:260px">
       <select id="ingSubfam" onchange="buscarIngSubfam()">
         <option value="">Todas las subfamilias</option>
       </select>
@@ -524,12 +524,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         <option value="">Todos</option><option value="true">✓ Validados</option><option value="false">⏳ Pendientes</option>
       </select>
       <span id="ingCount" style="font-size:12px;color:var(--gray)"></span>
-      <button class="btn" style="background:#E8F0E0;color:var(--olive);padding:7px 12px;font-size:12px" onclick="diagIngredientes()">🔍 Diagnóstico</button>
+      <button class="btn" style="background:#E8F0E0;color:var(--olive);padding:7px 12px;font-size:12px" onclick="diagInsumos()">🔍 Diagnóstico</button>
     </div>
     <div id="diagBox" style="display:none;background:var(--dark);color:#a8e6a3;border-radius:10px;padding:16px;margin-bottom:16px;font-family:monospace;font-size:12px;line-height:1.8;white-space:pre-wrap"></div>
     <div class="tw"><table class="tbl">
       <thead><tr>
-        <th>Ingrediente</th>
+        <th>Insumo</th>
         <th>Formato / Presentación</th>
         <th>Proveedor</th>
         <th>Unidad base</th>
@@ -548,7 +548,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 <div id="vImport" class="view">
   <div class="app-hdr">
     <div><div class="app-brand">a<span>z</span>uca</div><div class="app-sec">Importar CSV</div></div>
-    <div class="app-btns"><button class="abtn ab" onclick="showView('vIng')">← Ingredientes</button></div>
+    <div class="app-btns"><button class="abtn ab" onclick="showView('vIng')">← Insumos</button></div>
   </div>
   <div class="content">
     <div class="ptitle">Importar desde HioPOS</div>
@@ -598,7 +598,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         <button class="btn bp" onclick="openUserModal()">+ Nuevo usuario</button>
       </div>
       <div class="tw"><table class="tbl">
-        <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Local</th><th>Estado</th><th></th></tr></thead>
         <tbody id="usersTbody"></tbody>
       </table></div>
     </div>
@@ -630,7 +630,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   </div>
   <div class="content">
     <div class="ptitle">Requerimientos de mercadería</div>
-    <div class="psub" id="reqSubtitle">Pedidos de ingredientes y su seguimiento</div>
+    <div class="psub" id="reqSubtitle">Pedidos de insumos y su seguimiento</div>
 
     <!-- Pestañas del módulo -->
     <div class="req-modtabs">
@@ -695,7 +695,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
       <div class="req-soon">
         <div class="req-soon-icon">🧂</div>
         <div class="req-soon-tit">Listado de insumos</div>
-        <div class="req-soon-txt">Acá vas a poder consultar todos los ingredientes (validados y pendientes) sin salir de Requerimientos. <br><br><em>Próximamente en la Etapa 4.</em></div>
+        <div class="req-soon-txt">Acá vas a poder consultar todos los insumos (validados y pendientes) sin salir de Requerimientos. <br><br><em>Próximamente en la Etapa 4.</em></div>
       </div>
     </div>
 
@@ -803,11 +803,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
     <!-- Items -->
     <div style="font-size:13px;font-weight:600;color:var(--dark);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
-      <span>Ingredientes del pedido <span id="reqItemsCount" style="color:var(--gray);font-weight:500"></span></span>
+      <span>Insumos del pedido <span id="reqItemsCount" style="color:var(--gray);font-weight:500"></span></span>
     </div>
     <div class="req-items" id="reqItems"></div>
 
-    <button class="req-add" onclick="abrirSelectorIngrediente()">+ Agregar ingrediente</button>
+    <button class="req-add" onclick="abrirSelectorInsumo()">+ Agregar insumo</button>
 
     <!-- Acciones -->
     <div class="req-acciones">
@@ -820,12 +820,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   </div>
 </div>
 
-<!-- Modal: Selector de ingredientes -->
+<!-- Modal: Selector de insumos -->
 <div class="overlay" id="ovReqIng">
   <div class="modal">
     <button class="mc" onclick="closeOv('ovReqIng')">✕</button>
-    <h2>Agregar ingrediente</h2>
-    <div class="psub" style="margin-bottom:14px">Solo se muestran ingredientes validados por Compras.</div>
+    <h2>Agregar insumo</h2>
+    <div class="psub" style="margin-bottom:14px">Solo se muestran insumos validados por Compras.</div>
     <input type="text" id="reqIngBuscar" class="req-ing-search" placeholder="Buscar por nombre, formato o proveedor..." oninput="filtrarSelectorIng()">
     <div class="req-ing-list" id="reqIngList"></div>
   </div>
@@ -838,7 +838,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <h2 id="rTitle">Nueva Elaboración</h2>
     <input type="hidden" id="rTipo">
     <div class="frow">
-      <div class="fg"><label>Nombre</label><input type="text" id="rNombre" placeholder="Ej: Pasta de berenjena ahumada"></div>
+      <div class="fg"><label>Nombre</label><input type="text" id="rNombre" placeholder="EJ: PASTA DE BERENJENA AHUMADA" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
       <div class="fg"><label>Local de referencia</label>
         <select id="rLocal" onchange="onCambiarLocalPlato()"><option value="todos">Transversal (todos)</option>
           <option value="azafran">Azafrán</option><option value="trapiche">Espacio Trapiche</option>
@@ -859,7 +859,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="frow">
       <div class="fg"><label>Rendimiento</label><input type="number" id="rRend" value="1" min="0.001" step="0.001" oninput="updPrev()"></div>
       <div class="fg"><label>Unidad de rendimiento</label>
-        <select id="rUnd"><option value="porcion">porción</option><option value="kg">kg</option><option value="lt">lt</option><option value="unidad">unidad</option></select>
+        <select id="rUnd"><option value="kg">kg</option><option value="gr">gr</option><option value="lt">lt</option><option value="ml">ml</option><option value="unidad">un</option></select>
       </div>
     </div>
     <div class="frow" id="rPrecioRow" style="display:none">
@@ -871,7 +871,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
       <div class="csl">Componentes
         <div style="display:flex;gap:6px;align-items:center">
           <span id="compHint" style="font-size:11px;color:var(--gray);display:none">Tip: empezá agregando las sub-elaboraciones</span>
-          <button class="btn bs" style="padding:5px 12px;font-size:12px" onclick="addComp('ingrediente')">+ Ingrediente</button>
+          <button class="btn bs" style="padding:5px 12px;font-size:12px" onclick="addComp('ingrediente')">+ Insumo</button>
           <button class="btn bs" style="padding:5px 12px;font-size:12px" onclick="addComp('receta')">+ Sub-elaboración</button>
         </div>
       </div>
@@ -898,7 +898,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <button class="mc" onclick="closeOv('ovM')">✕</button>
     <h2 id="mTitle">Nuevo Menú</h2>
     <div class="frow">
-      <div class="fg"><label>Nombre del menú</label><input type="text" id="mNombre" placeholder="Ej: Paseo Federal"></div>
+      <div class="fg"><label>Nombre del menú</label><input type="text" id="mNombre" placeholder="EJ: PASEO FEDERAL" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
       <div class="fg"><label>Local</label>
         <select id="mLocal" onchange="rendPlatDisp()"><option value="azafran">Azafrán</option><option value="trapiche">Espacio Trapiche</option>
           <option value="nieto">Nieto Senetiner</option><option value="vinobien">Vinobien</option><option value="cobos">Viña Cobos</option>
@@ -938,20 +938,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
   <div class="modal wide"><button class="mc" onclick="closeOv('ovVM')">✕</button><div id="vmContent"></div></div>
 </div>
 
-<!-- Modal Ingrediente -->
+<!-- Modal Insumo -->
 <div class="overlay" id="ovI">
   <div class="modal" style="max-width:560px">
     <button class="mc" onclick="closeOv('ovI')">✕</button>
-    <h2 id="iTitle">Nuevo Ingrediente</h2>
+    <h2 id="iTitle">Nuevo Insumo</h2>
 
     <!-- Nombre -->
     <div class="frow">
-      <div class="fg full"><label>Nombre del ingrediente</label><input type="text" id="iNom" placeholder="Ej: Aceite de oliva"></div>
+      <div class="fg full"><label>Nombre del insumo</label><input type="text" id="iNom" placeholder="EJ: ACEITE DE OLIVA" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
 
     <!-- Presentación comercial -->
     <div class="frow">
-      <div class="fg full"><label>Formato / Presentación comercial</label><input type="text" id="iFmt" placeholder="Ej: Bidón 5 lt, Caja 6x500 ml, Bolsa 1 kg"></div>
+      <div class="fg full"><label>Formato / Presentación comercial</label><input type="text" id="iFmt" placeholder="EJ: BIDÓN 5 LT, CAJA 6X500 ML, BOLSA 1 KG" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
 
     <!-- Unidad base + Cantidad por envase -->
@@ -985,7 +985,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
     <!-- Proveedor y subfamilia -->
     <div class="frow">
-      <div class="fg"><label>Proveedor</label><input type="text" id="iProv" placeholder="Ej: Depósito Vista Pueblo"></div>
+      <div class="fg"><label>Proveedor</label><input type="text" id="iProv" placeholder="EJ: DEPÓSITO VISTA PUEBLO" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
       <div class="fg"><label>Subfamilia</label>
         <select id="iSub"><option value="">Sin subfamilia</option></select>
       </div>
@@ -999,7 +999,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
     <div style="background:var(--cream);border-radius:10px;padding:12px 16px;margin-top:8px;font-size:12px;color:var(--gray);line-height:1.6">
       <strong style="color:var(--dark)">ℹ️ Cómo funciona:</strong> Compras carga el precio del envase y cuántas unidades base trae.
-      Cocina solo ve el ingrediente y escribe cuántas unidades base usa (ej: 0,25 lt). El sistema calcula el costo automáticamente.
+      Cocina solo ve el insumo y escribe cuántas unidades base usa (ej: 0,25 lt). El sistema calcula el costo automáticamente.
     </div>
 
     <div class="ma" style="gap:8px">
@@ -1052,7 +1052,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     </div>
     <div class="frow">
       <div class="fg"><label>Estado</label><select id="uAct"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
-      <input type="hidden" id="uLocal" value="todos">
+      <div class="fg"><label>Local asignado</label>
+        <select id="uLocal">
+          <option value="todos">🌐 Todos (transversal)</option>
+          <option value="azafran">Azafrán</option>
+          <option value="trapiche">Espacio Trapiche</option>
+          <option value="nieto">Nieto Senetiner</option>
+          <option value="vinobien">Vinobien</option>
+          <option value="cobos">Viña Cobos</option>
+        </select>
+      </div>
     </div>
     <div class="ma">
       <button class="btn bs" onclick="closeOv('ovU')">Cancelar</button>
@@ -1120,7 +1129,7 @@ function convertir(cantidad,de,a){
   return cantidad*(A_BASE[de]/A_BASE[a]);
 }
 
-// Costo por unidad base dado un ingrediente.
+// Costo por unidad base dado un insumo.
 // Si tiene cantidad_por_presentacion > 0, divide el costo del envase → costo por 1 unidad base (ej: 1 g).
 // Si no, usa costo directamente (retrocompatibilidad).
 function costoUnitario(ing){
@@ -1130,8 +1139,8 @@ function costoUnitario(ing){
   return ing.costo||0;
 }
 
-// Calcula el costo de usar `cantidad` en unidad `undReceta` de un ingrediente cuya unidad base es `ing.unidad`.
-// Convierte automáticamente si son unidades compatibles (ej: receta en kg, ingrediente en g).
+// Calcula el costo de usar `cantidad` en unidad `undReceta` de un insumo cuya unidad base es `ing.unidad`.
+// Convierte automáticamente si son unidades compatibles (ej: receta en kg, insumo en g).
 function costoConversion(ing,cantidad,undReceta){
   if(!ing) return 0;
   const undBase=ing.unidad||'';
@@ -1152,7 +1161,7 @@ function showView(id){
     toast('⛔ Compras no tiene acceso a recetas'); return;
   }
   if(esCocina && (id==='vIng'||id==='vImport'||id==='vUsers')){
-    toast('⛔ Cocina no tiene acceso a ingredientes'); return;
+    toast('⛔ Cocina no tiene acceso a insumos'); return;
   }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -1184,7 +1193,7 @@ function poblarSelectsLocales(){
     'rLocal':optsReceta,'mLocal':optsSinTodos,
   };
   Object.entries(mapa).forEach(([id,opts])=>{const el=document.getElementById(id);if(el)el.innerHTML=opts;});
-  // También los filtros de ingredientes no tienen select de local, ok
+  // También los filtros de insumos no tienen select de local, ok
 }
 
 async function doLogin(){
@@ -1216,7 +1225,7 @@ function buildDash(){
     {i:'📦',t:'Requerimientos',d:'Pedidos de mercadería',a:"showView('vReq')"},
   ];
   if(CU.rol==='compras'||CU.rol==='admin'){
-    cards.push({i:'🧂',t:'Ingredientes',d:'Precios y proveedores',badge:'Compras',bc:'boli',a:"showView('vIng')"});
+    cards.push({i:'🧂',t:'Insumos',d:'Precios y proveedores',badge:'Compras',bc:'boli',a:"showView('vIng')"});
     cards.push({i:'📂',t:'Importar CSV',d:'Actualizar desde HioPOS',badge:'HioPOS',bc:'brus',a:"showView('vImport')"});
   }
   if(CU.rol==='admin') cards.push({i:'⚙️',t:'Administración',d:'Usuarios y locales',badge:'Admin',bc:'bgry',a:"showView('vUsers')",full:true});
@@ -1356,7 +1365,7 @@ async function buscarIng(){
   const ings=data||[];
   const total=count||0;
   INGS=ings;
-  document.getElementById('ingCount').textContent=`${total.toLocaleString('es-AR')} ingredientes`;
+  document.getElementById('ingCount').textContent=`${total.toLocaleString('es-AR')} insumos`;
   renderIngData(ings);
   renderIngPager(total);
 }
@@ -1488,7 +1497,7 @@ window.openPlatoModal=openPlatoModal;
 function resetRForm(){
   ['rNombre','rTiempo','rProc','rPrecio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('rLocal').value='todos';document.getElementById('rCat').value='';
-  document.getElementById('rRend').value='1';document.getElementById('rUnd').value='porcion';
+  document.getElementById('rRend').value='1';document.getElementById('rUnd').value='kg';
   document.getElementById('compRows').innerHTML='';updPrev();
 }
 
@@ -1611,7 +1620,7 @@ function addCompRow(c={}){
   const tipo=c.tipo_componente||'ingrediente';const tr=document.createElement('tr');
   let opts='';
   if(tipo==='ingrediente'){
-    // Mostrar cualquier ingrediente que tenga nombre y no esté explícitamente sin validar
+    // Mostrar cualquier insumo que tenga nombre y no esté explícitamente sin validar
     opts=INGS.filter(i=>i.nombre&&i.validado!=false).map(i=>{
       return `<option value="${i.id}" ${c.ingrediente_id===i.id?'selected':''}>${i.nombre}${i.formato?' — '+i.formato:''}</option>`;
     }).join('');
@@ -1632,13 +1641,13 @@ function addCompRow(c={}){
   tr.dataset.tipo=tipo;
   const unidadVal=c.unidad||'';
   // El campo de unidad para ingredientes: select con todas las unidades.
-  // Se actualiza con ★ al elegir el ingrediente (llenarUnidadComp).
+  // Se actualiza con ★ al elegir el insumo (llenarUnidadComp).
   const optsUnd=TODAS_UNIDADES.map(u=>`<option value="${u}" ${(unidadVal||'g')===u?'selected':''}>${u}</option>`).join('');
-  // Tanto ingredientes como sub-elaboraciones usan select de unidades
+  // Tanto insumos como sub-elaboraciones usan select de unidades
   const undCell=`<select class="cu" onchange="updPrev()" style="width:72px;padding:5px 4px;font-size:12px;border:1px solid var(--sand);border-radius:6px;background:var(--cream)">${optsUnd}</select>`;
   tr.innerHTML=`<td><span class="badge ${tipo==='ingrediente'?'bol':'bbl'}" style="font-size:10px;white-space:nowrap">${tipo==='ingrediente'?'🧂':'🧪'}</span></td>
     <td style="min-width:0;width:100%"><select class="cr" onchange="onCompSelect(this);updPrev()"><option value="">Seleccionar...</option>${opts}</select></td>
-    <td><input type="number" class="cq" value="${c.cantidad||''}" placeholder="0" step="0.001" min="0" oninput="updPrev()" style="width:75px"></td>
+    <td><input type="number" class="cq" value="${c.cantidad||''}" placeholder="0" step="1" min="0" oninput="updPrev()" style="width:75px"></td>
     <td>${undCell}</td>
     <td class="cc price" style="min-width:65px">$0</td>
     <td><button class="bd" onclick="this.closest('tr').remove();updPrev()">✕</button></td>`;
@@ -1656,7 +1665,7 @@ function addCompRow(c={}){
   updPrev();
 }
 
-// Cuando se selecciona un ingrediente en la receta, actualiza el select de unidades compatibles
+// Cuando se selecciona un insumo en la receta, actualiza el select de unidades compatibles
 function onCompSelect(sel){
   const tr=sel.closest('tr');
   const id=parseInt(sel.value)||0;
@@ -1667,7 +1676,7 @@ window.onCompSelect=onCompSelect;
 
 const TODAS_UNIDADES=['g','kg','ml','lt','unidad'];
 
-// Pobla el select para ingredientes — usa unidad base del ingrediente con ★
+// Pobla el select para insumos — usa unidad base del insumo con ★
 function llenarUnidadComp(tr,ingId,undPrevia=''){
   const i=ING_MAP[ingId]||INGS.find(x=>x.id===ingId);
   const sel=tr.querySelector('.cu');
@@ -1675,7 +1684,7 @@ function llenarUnidadComp(tr,ingId,undPrevia=''){
   if(!i){sel.innerHTML='<option value="">—</option>';return;}
   const base=(i.unidad==='l'?'lt':i.unidad)||'';
   const elegida=(undPrevia==='l'?'lt':undPrevia)||base||'g';
-  // Solo mostrar unidades compatibles con la unidad base del ingrediente
+  // Solo mostrar unidades compatibles con la unidad base del insumo
   const compatibles=unidadesCompatibles(base);
   sel.innerHTML=compatibles.map(u=>{
     return `<option value="${u}" ${elegida===u?'selected':''}>${u===base?u+' ★':u}</option>`;
@@ -1950,7 +1959,7 @@ window.actualizarInfoUnidad=actualizarInfoUnidad;
 
 function openIngModal(){
   eIng=null;
-  document.getElementById('iTitle').textContent='Nuevo Ingrediente';
+  document.getElementById('iTitle').textContent='Nuevo Insumo';
   ['iNom','iFmt','iProv','iCod','iCantBase'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('iCosto').value='';
   document.getElementById('iUnd').value='kg';
@@ -1963,7 +1972,7 @@ window.openIngModal=openIngModal;
 
 function editIng(id){
   const i=INGS.find(x=>x.id===id);if(!i)return;eIng=id;
-  document.getElementById('iTitle').textContent='Editar Ingrediente';
+  document.getElementById('iTitle').textContent='Editar Insumo';
   document.getElementById('iNom').value=i.nombre||'';
   document.getElementById('iFmt').value=i.formato||'';
   document.getElementById('iProv').value=i.proveedor||'';
@@ -2048,10 +2057,10 @@ async function doImport(){
     return {nombre:nom,formato:g('formato')?row[g('formato')]?.trim()||null:null,proveedor:g('proveedor')?row[g('proveedor')]?.trim()||null:null,familia:'INSUMOS',subfamilia:subfam,codigo_hiopos:g('codigo')?row[g('codigo')]?.trim()||null:null,unidad,costo,cantidad_por_presentacion:null,validado:false,activo:true,actualizado_en:new Date().toISOString()};
   }).filter(Boolean);
   if(!batch.length){toast('Sin filas con familia INSUMOS');return;}
-  toast(`Importando ${batch.length} ingredientes...`,8000);
+  toast(`Importando ${batch.length} insumos...`,8000);
   let ok=0;
   for(let i=0;i<batch.length;i+=100){const r=await api('ingredientes','POST',batch.slice(i,i+100));if(r)ok+=Math.min(100,batch.length-i);}
-  toast(`✓ ${ok} ingredientes importados. Pendientes de validación y completar "cantidad por envase".`,6000);
+  toast(`✓ ${ok} insumos importados. Pendientes de validación y completar "cantidad por envase".`,6000);
   cancelCSV();await loadIng();showView('vIng');
 }
 window.doImport=doImport;
@@ -2130,7 +2139,13 @@ window.delLocal=delLocal;
 
 async function loadUsers(){
   USERS=await api('usuarios?select=*&order=rol.asc,nombre.asc')||[];
-  document.getElementById('usersTbody').innerHTML=USERS.map(u=>`<tr><td><strong>${u.nombre}</strong></td><td>@${u.usuario}</td><td>${RL[u.rol]||u.rol}</td><td><span class="badge ${u.activo?'bg':'bgr'}">${u.activo?'Activo':'Inactivo'}</span></td><td style="display:flex;gap:4px">${u.id!==CU.id?`<button class="bsm" onclick="editUser(${u.id})">✏️</button><button class="bd" onclick="delUser(${u.id})">🗑</button>`:'<span style="color:var(--gray);font-size:11px">tu cuenta</span>'}</td></tr>`).join('');
+  const localesNom={todos:'🌐 Todos',azafran:'Azafrán',trapiche:'Espacio Trapiche',nieto:'Nieto Senetiner',vinobien:'Vinobien',cobos:'Viña Cobos'};
+  document.getElementById('usersTbody').innerHTML=USERS.map(u=>{
+    const localTxt=localesNom[u.local]||u.local||'—';
+    // Resaltar cocina sin local específico (inconsistencia)
+    const alerta=(u.rol==='cocina'&&(u.local==='todos'||!u.local))?'<span style="color:#C0392B;font-size:11px;margin-left:4px" title="Cocina sin local: no podrá hacer pedidos correctamente">⚠</span>':'';
+    return `<tr><td><strong>${u.nombre}</strong></td><td>@${u.usuario}</td><td>${RL[u.rol]||u.rol}</td><td>${localTxt}${alerta}</td><td><span class="badge ${u.activo?'bg':'bgr'}">${u.activo?'Activo':'Inactivo'}</span></td><td style="display:flex;gap:4px">${u.id!==CU.id?`<button class="bsm" onclick="editUser(${u.id})">✏️</button><button class="bd" onclick="delUser(${u.id})">🗑</button>`:'<span style="color:var(--gray);font-size:11px">tu cuenta</span>'}</td></tr>`;
+  }).join('');
 }
 
 function openUserModal(){
@@ -2154,7 +2169,12 @@ window.editUser=editUser;
 async function saveUser(){
   const nom=document.getElementById('uNom').value.trim();const usr=document.getElementById('uUser').value.trim().toLowerCase();const pass=document.getElementById('uPass').value;const rol=document.getElementById('uRol').value;
   if(!nom||!usr||!rol){toast('Completá todos los campos');return;}
-  const body={nombre:nom,usuario:usr,rol,local:document.getElementById('uLocal').value,activo:document.getElementById('uAct').value==='true'};
+  const localElegido=document.getElementById('uLocal').value;
+  // Aviso: Cocina con local "todos" no tiene sentido (no podrá pedir para nadie)
+  if(rol==='cocina'&&localElegido==='todos'){
+    if(!confirm('⚠️ Estás guardando un usuario de COCINA sin local específico.\n\nLos usuarios de Cocina deberían tener un local asignado (Azafrán, Trapiche, etc.) para poder hacer pedidos.\n\n¿Guardar igual?')) return;
+  }
+  const body={nombre:nom,usuario:usr,rol,local:localElegido,activo:document.getElementById('uAct').value==='true'};
   if(eUser){if(pass){if(pass.length<6){toast('Mínimo 6 caracteres');return;}body.password_hash=await sha256(pass);}await api(`usuarios?id=eq.${eUser}`,'PATCH',body);toast('Actualizado ✓');}
   else{if(!pass||pass.length<6){toast('Contraseña: mínimo 6 caracteres');return;}body.password_hash=await sha256(pass);await api('usuarios','POST',body);toast('Usuario creado ✓');}
   closeOv('ovU');await loadUsers();
@@ -2167,7 +2187,7 @@ async function delUser(id){
 }
 window.delUser=delUser;
 
-async function diagIngredientes(){
+async function diagInsumos(){
   const box=document.getElementById('diagBox');
   box.style.display='block';
   box.textContent='Consultando Supabase...';
@@ -2195,7 +2215,7 @@ async function diagIngredientes(){
 
   box.textContent=txt;
 }
-window.diagIngredientes=diagIngredientes;
+window.diagInsumos=diagInsumos;
 
 // ============================================================================
 // MÓDULO REQUERIMIENTOS DE MERCADERÍA
@@ -2232,7 +2252,7 @@ function reqLocalDelUsuario(){
 // ---------- Carga inicial de la vista ----------
 async function loadReq(){
   // CRÍTICO: aseguramos que INGS esté cargada (si entran directo a Requerimientos
-  // sin pasar por Recetas/Platos, la lista global está vacía y los items mostrarían "(ingrediente)")
+  // sin pasar por Recetas/Platos, la lista global está vacía y los items mostrarían "(insumo)")
   await loadAll();
 
   // Cargar unidades de pedido (catálogo editable)
@@ -2258,9 +2278,9 @@ async function loadReq(){
 
   // Subtítulo descriptivo según rol
   const sub=document.getElementById('reqSubtitle');
-  if(reqEsAdmin()) sub.textContent='Pedidos de ingredientes y su seguimiento. Como Admin podés ver y editar todos.';
-  else if(reqEsCompras()) sub.textContent='Pedidos de ingredientes. Como Compras revisás y comprometés fechas.';
-  else sub.textContent=`Pedidos de ingredientes para tu local. Creá pre-pedidos y editalos antes de confirmar.`;
+  if(reqEsAdmin()) sub.textContent='Pedidos de insumos y su seguimiento. Como Admin podés ver y editar todos.';
+  else if(reqEsCompras()) sub.textContent='Pedidos de insumos. Como Compras revisás y comprometés fechas.';
+  else sub.textContent=`Pedidos de insumos para tu local. Creá pre-pedidos y editalos antes de confirmar.`;
 
   // Default tab según rol: Cocina arranca en Pre-pedidos, Compras/Admin en Pendientes
   if(!reqEsCompras()){
@@ -2358,6 +2378,8 @@ function renderReq(){
     const localNom=reqNomLocal(r.local);
     const est=estadoPedido(r);
     const badge=`<span class="req-badge ${est.claseBadge}">${est.icon?est.icon+' ':''}${est.label}</span>`;
+    const editor=r.actualizado_por?USERS_MAP[r.actualizado_por]:null;
+    const aud=editor?`<div style="font-size:10px;color:var(--gray);margin-top:6px">✏ Última edición: ${editor}</div>`:'';
     return `<div class="req-card ${est.claseCard}" onclick="abrirReq(${r.id})">
       <div class="req-card-hdr">
         <span class="req-card-id">Pedido #${r.id}</span>
@@ -2369,9 +2391,10 @@ function renderReq(){
         ${fCom?` · F. est. entrega: ${fCom}`:''}
       </div>
       <div class="req-card-foot">
-        <span>${items.length} ingrediente${items.length===1?'':'s'} · ${recibidos} recibido${recibidos===1?'':'s'}</span>
+        <span>${items.length} insumo${items.length===1?'':'s'} · ${recibidos} recibido${recibidos===1?'':'s'}</span>
         <span style="font-size:14px">›</span>
       </div>
+      ${aud}
     </div>`;
   }).join('');
 }
@@ -2438,14 +2461,19 @@ function openReqNuevo(){
   document.getElementById('reqDetFechaDeseada').value='';
   document.getElementById('reqDetFechaComp').value='';
 
-  // Local por defecto: el del usuario si tiene, sino el primero
+  // Local por defecto: el del usuario si tiene un local específico asignado, sino el primero del select
   const localUsuario=CU.local;
   const selLocal=document.getElementById('reqDetLocal');
   if(localUsuario&&['azafran','trapiche','nieto','vinobien','cobos'].includes(localUsuario)){
     selLocal.value=localUsuario;
+  } else {
+    // Usuario sin local específico (típicamente Compras/Admin): dejar el primero como default
+    // pero NO bloqueado para que pueda elegir cualquier local
+    selLocal.selectedIndex=0;
   }
-  // Cocina no puede cambiar el local del pedido (solo crea para el suyo)
-  selLocal.disabled=!reqEsCompras();
+  // Cocina (usuario con local específico) no puede cambiar el local del pedido
+  // Compras y Admin sí pueden elegir cualquier local
+  selLocal.disabled=reqLocalDelUsuario()!==null && !reqEsCompras();
 
   // En un pre-pedido nuevo, Cocina NO puede tocar fecha estimada (es de Compras)
   document.getElementById('reqDetFechaDeseada').disabled=false;
@@ -2539,15 +2567,15 @@ function renderItemsEdit(readonly=false){
 
   if(!REQ_ITEMS_DRAFT.length){
     cont.innerHTML=`<div class="req-empty" style="padding:24px">
-      <div class="req-empty-txt" style="font-size:13px">Todavía no agregaste ingredientes</div>
-      <div class="req-empty-sub">Tocá "+ Agregar ingrediente" abajo</div>
+      <div class="req-empty-txt" style="font-size:13px">Todavía no agregaste insumos</div>
+      <div class="req-empty-sub">Tocá "+ Agregar insumo" abajo</div>
     </div>`;
     return;
   }
 
   cont.innerHTML=REQ_ITEMS_DRAFT.map((it,idx)=>{
     const ing=INGS.find(x=>x.id===it.ingrediente_id);
-    const nom=ing?ing.nombre:'(ingrediente no encontrado)';
+    const nom=ing?ing.nombre:'(insumo no encontrado)';
     const desc=ing?[ing.formato,ing.proveedor].filter(Boolean).join(' · '):'';
     const tieneCom=!!(it.comentario_pedido&&it.comentario_pedido.trim());
 
@@ -2572,6 +2600,14 @@ function renderItemsEdit(readonly=false){
 
     const roAttr=readonly?'disabled':'';
     const roInp=readonly?'readonly':'';
+
+    // Costo estimado del pedido: cantidad_pedida × costo del envase
+    // (Es referencial porque la unidad del pedido puede no coincidir con la presentación)
+    let costoHtml='';
+    if(ing&&ing.costo&&it.cantidad_pedida){
+      const costoEst=ing.costo*it.cantidad_pedida;
+      costoHtml=`<div class="req-costo"><span>Costo estimado: <strong>${fmt(costoEst)}</strong> <small>(${fmt(ing.costo)}/${ing.formato||'envase'} × ${it.cantidad_pedida})</small></span></div>`;
+    }
 
     return `<div class="req-item">
       <div class="req-item-row1">
@@ -2605,6 +2641,7 @@ function renderItemsEdit(readonly=false){
       <div class="req-com-row ${tieneCom?'open':''}" id="comRow${idx}">
         <input type="text" placeholder="Comentario del pedido (opcional)" value="${(it.comentario_pedido||'').replace(/"/g,'&quot;')}" ${roInp} oninput="updItem(${idx},'comentario_pedido',this.value)">
       </div>
+      ${costoHtml}
     </div>`;
   }).join('');
 }
@@ -2647,7 +2684,7 @@ function toggleDestino(idx,slug){
     it.destinos.splice(i,1);
   } else {
     if(it.destinos.length>=2){
-      toast('Máximo 2 destinos por ingrediente');
+      toast('Máximo 2 destinos por insumo');
       return;
     }
     it.destinos.push(slug);
@@ -2657,19 +2694,19 @@ function toggleDestino(idx,slug){
 window.toggleDestino=toggleDestino;
 
 function quitarItem(idx){
-  if(!confirm('¿Quitar este ingrediente del pedido?'))return;
+  if(!confirm('¿Quitar este insumo del pedido?'))return;
   REQ_ITEMS_DRAFT.splice(idx,1);
   renderItemsEdit();
 }
 window.quitarItem=quitarItem;
 
-// ---------- Selector de ingredientes ----------
-function abrirSelectorIngrediente(){
+// ---------- Selector de insumos ----------
+function abrirSelectorInsumo(){
   document.getElementById('reqIngBuscar').value='';
   filtrarSelectorIng();
   openOv('ovReqIng');
 }
-window.abrirSelectorIngrediente=abrirSelectorIngrediente;
+window.abrirSelectorInsumo=abrirSelectorInsumo;
 
 function filtrarSelectorIng(){
   const q=(document.getElementById('reqIngBuscar').value||'').toLowerCase().trim();
@@ -2687,7 +2724,7 @@ function filtrarSelectorIng(){
 
   const cont=document.getElementById('reqIngList');
   if(!lista.length){
-    cont.innerHTML=`<div class="req-ing-empty">${q?'Sin resultados para "'+q+'"':'No quedan ingredientes para agregar'}</div>`;
+    cont.innerHTML=`<div class="req-ing-empty">${q?'Sin resultados para "'+q+'"':'No quedan insumos para agregar'}</div>`;
     return;
   }
   cont.innerHTML=lista.map(i=>{
@@ -2702,7 +2739,7 @@ window.filtrarSelectorIng=filtrarSelectorIng;
 
 function agregarItem(ingId){
   const ing=INGS.find(x=>x.id===ingId);
-  if(!ing){toast('Ingrediente no encontrado');return;}
+  if(!ing){toast('Insumo no encontrado');return;}
   REQ_ITEMS_DRAFT.push({
     ingrediente_id:ing.id,
     cantidad_pedida:null,
@@ -2725,12 +2762,12 @@ window.agregarItem=agregarItem;
 async function guardarReq(esConfirmar=false){
   const local=document.getElementById('reqDetLocal').value;
   if(!local){toast('Falta el local');return;}
-  if(!REQ_ITEMS_DRAFT.length){toast('Agregá al menos un ingrediente');return;}
+  if(!REQ_ITEMS_DRAFT.length){toast('Agregá al menos un insumo');return;}
 
   // Validación: todos los items deben tener cantidad, unidad, stock y unidad_stock
   for(const it of REQ_ITEMS_DRAFT){
     const ing=INGS.find(x=>x.id===it.ingrediente_id);
-    const nomIng=ing?ing.nombre:'(ingrediente)';
+    const nomIng=ing?ing.nombre:'(insumo)';
     if(!it.cantidad_pedida||it.cantidad_pedida<=0){
       toast(`Falta cantidad pedida para "${nomIng}"`);
       return;
@@ -2979,7 +3016,7 @@ function renderRecCard(r,esPendiente,tsHoy){
       ${metaExtra}
     </div>
     <div class="req-card-foot">
-      <span>${items.length} ingrediente${items.length===1?'':'s'} · ${recibidos}/${items.length} recibido${recibidos===1?'':'s'}</span>
+      <span>${items.length} insumo${items.length===1?'':'s'} · ${recibidos}/${items.length} recibido${recibidos===1?'':'s'}</span>
       <span style="font-size:14px">›</span>
     </div>
   </div>`;
@@ -3043,7 +3080,7 @@ function renderRecItems(){
 
   cont.innerHTML=REC_ITEMS_DRAFT.map((it,idx)=>{
     const ing=INGS.find(x=>x.id===it.ingrediente_id);
-    const nom=ing?ing.nombre:'(ingrediente)';
+    const nom=ing?ing.nombre:'(insumo)';
     const desc=ing?[ing.formato,ing.proveedor].filter(Boolean).join(' · '):'';
     const done=it.estado_recepcion&&it.estado_recepcion!=='pendiente';
     const necesitaComentario=it.estado_recepcion==='modificado'||it.estado_recepcion==='incompleto';
@@ -3102,9 +3139,9 @@ async function guardarRecepcion(){
   if(sinComentario.length){
     const nombres=sinComentario.slice(0,3).map(it=>{
       const ing=INGS.find(x=>x.id===it.ingrediente_id);
-      return ing?ing.nombre:'(ingrediente)';
+      return ing?ing.nombre:'(insumo)';
     }).join(', ');
-    if(!confirm(`Hay ${sinComentario.length} ingrediente${sinComentario.length===1?'':'s'} marcado${sinComentario.length===1?'':'s'} como Modificado/Incompleto sin comentario:\n\n${nombres}${sinComentario.length>3?'...':''}\n\n¿Guardar igual?`))return;
+    if(!confirm(`Hay ${sinComentario.length} insumo${sinComentario.length===1?'':'s'} marcado${sinComentario.length===1?'':'s'} como Modificado/Incompleto sin comentario:\n\n${nombres}${sinComentario.length>3?'...':''}\n\n¿Guardar igual?`))return;
   }
 
   // Actualizar cada item modificado
@@ -3284,7 +3321,7 @@ async function openStockNuevo(){
     comentario:''
   }));
 
-  // Ordenar por nombre del ingrediente
+  // Ordenar por nombre del insumo
   STOCK_ITEMS_DRAFT.sort((a,b)=>{
     const ia=INGS.find(x=>x.id===a.ingrediente_id);
     const ib=INGS.find(x=>x.id===b.ingrediente_id);
@@ -3315,7 +3352,7 @@ function renderStockItems(readonly=false){
 
   cont.innerHTML=STOCK_ITEMS_DRAFT.map((it,idx)=>{
     const ing=INGS.find(x=>x.id===it.ingrediente_id);
-    const nom=ing?ing.nombre:'(ingrediente)';
+    const nom=ing?ing.nombre:'(insumo)';
     const desc=ing?[ing.formato,ing.proveedor].filter(Boolean).join(' · '):'';
     const roInp=readonly?'readonly':'';
     const roAttr=readonly?'disabled':'';
@@ -3409,7 +3446,7 @@ function exportarRecuentoExcel(){
   csv+=`Fecha;${fecha}\n`;
   if(obs) csv+=`Observaciones;${obs.replace(/[\r\n;]/g,' ')}\n`;
   csv+=`\n`;
-  csv+=`Ingrediente;Formato;Proveedor;Cantidad;Unidad;Comentario\n`;
+  csv+=`Insumo;Formato;Proveedor;Cantidad;Unidad;Comentario\n`;
 
   for(const it of STOCK_ITEMS_DRAFT){
     const ing=INGS.find(x=>x.id===it.ingrediente_id);
