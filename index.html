@@ -55,16 +55,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .content{padding:20px;max-width:1100px;margin:0 auto}
 .ptitle{font-family:'Playfair Display',serif;font-size:24px;margin-bottom:6px}
 .psub{color:var(--gray);font-size:13px;margin-bottom:20px}
-.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px}
-.card{background:var(--white);border:1px solid var(--sand-l);border-radius:12px;padding:18px;cursor:pointer;transition:all .2s}
-.card:hover{border-color:var(--olive);box-shadow:0 4px 14px rgba(92,107,58,.1);transform:translateY(-1px)}
-.card h3{font-family:'Playfair Display',serif;font-size:16px;margin-bottom:4px}
-.card .meta{color:var(--gray);font-size:12px;margin-bottom:12px}
-.card .foot{display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--sand-l)}
-.cv{font-size:17px;font-weight:700;color:var(--olive)}.cl{font-size:11px;color:var(--gray)}
-.ltag{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--white);padding:3px 8px;border-radius:20px;display:inline-block;margin-bottom:8px}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:20px}
+.card{background:var(--white);border:1px solid var(--sand-l);border-radius:10px;padding:11px 12px;cursor:pointer;transition:all .15s}
+.card:hover{border-color:var(--olive);box-shadow:0 2px 8px rgba(92,107,58,.1)}
+.card h3{font-family:'Playfair Display',serif;font-size:14px;margin-bottom:2px;line-height:1.25}
+.card .meta{color:var(--gray);font-size:11px;margin-bottom:8px}
+.card .foot{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--sand-l);gap:6px}
+.cv{font-size:14px;font-weight:700;color:var(--olive);line-height:1.1}.cl{font-size:10px;color:var(--gray);line-height:1.1}
+.ltag{font-size:9px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--white);padding:2px 7px;border-radius:14px;display:inline-block;margin-bottom:5px}
 .ltag.azafran{background:#8B1A1A}.ltag.trapiche{background:#2C5F2E}.ltag.nieto{background:#6B4226}.ltag.vinobien{background:#6B3A6B}.ltag.cobos{background:#3A5A7A}.ltag.todos{background:var(--gray)}
-.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;display:inline-block}
+.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;display:inline-block}
 .bg{background:#E8F5E9;color:var(--green)}.bw{background:#FFF8E1;color:#E67E22}.br{background:#FFEBEE;color:var(--red)}.bgr{background:#F0EDE8;color:var(--gray)}.bol{background:#E8F0E0;color:var(--olive)}.bbl{background:#E3F0FB;color:var(--blue)}
 .bval{background:#E8F5E9;color:var(--green)}.bpen{background:#FFF8E1;color:#E67E22}
 .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
@@ -1420,9 +1420,10 @@ function renderElab(){
   const s=(document.getElementById('elabSearch').value||'').toLowerCase();
   const l=document.getElementById('elabLocal').value;
   const g=document.getElementById('elabGrid');
-  const f=RECS.filter(r=>r.tipo==='elaboracion'&&(!s||r.nombre.toLowerCase().includes(s))&&(!l||r.local===l||r.local==='todos'));
+  const f=RECS.filter(r=>r.tipo==='elaboracion'&&(!s||r.nombre.toLowerCase().includes(s))&&(!l||r.local===l||r.local==='todos'))
+    .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es'));
   if(!f.length){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="icon">🧪</div><p>No hay elaboraciones todavía.</p></div>`;return;}
-  g.innerHTML=f.map(r=>{const aud=r.actualizado_por?`<div style="font-size:10px;color:var(--gray);margin-top:6px">Modificado por ${USERS_MAP[r.actualizado_por]||'—'}</div>`:'';return`<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="foot"><div><div class="cl">Costo / ${r.unidad_rendimiento||'u'}</div><div class="cv">${fmt(costo(r))}</div></div><span class="badge bol">rinde ${r.rendimiento} ${r.unidad_rendimiento||'u'}</span></div>${aud}</div>`;}).join('');
+  g.innerHTML=f.map(r=>{const aud=r.actualizado_por?`<div style="font-size:9px;color:var(--gray);margin-top:4px;opacity:0.7">Modificado por ${USERS_MAP[r.actualizado_por]||'—'}</div>`:'';return`<div class="card" onclick="verR(${r.id})">${ltag(r.local)}<h3>${r.nombre}</h3><div class="foot"><div><div class="cl">Costo / ${r.unidad_rendimiento||'u'}</div><div class="cv">${fmt(costo(r))}</div></div><span class="badge bol">rinde ${r.rendimiento} ${r.unidad_rendimiento||'u'}</span></div>${aud}</div>`;}).join('');
 }
 
 function renderPlatos(){
@@ -1430,13 +1431,14 @@ function renderPlatos(){
   const cat=document.getElementById('platoCat').value;
   const l=document.getElementById('platoLocal').value;
   const g=document.getElementById('platosGrid');
-  const f=RECS.filter(r=>r.tipo==='plato'&&(!s||r.nombre.toLowerCase().includes(s))&&(!cat||r.categoria===cat)&&(!l||r.local===l||r.local==='todos'));
+  const f=RECS.filter(r=>r.tipo==='plato'&&(!s||r.nombre.toLowerCase().includes(s))&&(!cat||r.categoria===cat)&&(!l||r.local===l||r.local==='todos'))
+    .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es'));
   if(!f.length){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="icon">🍽️</div><p>No hay platos todavía.</p></div>`;return;}
   g.innerHTML=f.map(r=>{
     const c=costo(r);const ok=(r.receta_componentes||[]).length>0;
     const pv=parseFloat(r.precio_venta)||0;
     const fc=pv>0&&ok?(c/pv*100).toFixed(1):null;
-    const aud=r.actualizado_por?`<div style="font-size:10px;color:var(--gray);margin-top:6px">Modificado por ${USERS_MAP[r.actualizado_por]||'—'}</div>`:'';
+    const aud=r.actualizado_por?`<div style="font-size:9px;color:var(--gray);margin-top:4px;opacity:0.7">Modificado por ${USERS_MAP[r.actualizado_por]||'—'}</div>`:'';
     // Bloque derecho del footer: depende si tiene precio o no
     let derecha;
     if(!ok){
@@ -1454,7 +1456,8 @@ function renderMenus(){
   const s=(document.getElementById('menuSearch').value||'').toLowerCase();
   const l=document.getElementById('menuLocal').value;
   const g=document.getElementById('menusGrid');
-  const f=MENUS.filter(m=>(!s||m.nombre.toLowerCase().includes(s))&&(!l||m.local===l));
+  const f=MENUS.filter(m=>(!s||m.nombre.toLowerCase().includes(s))&&(!l||m.local===l))
+    .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es'));
   if(!f.length){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="icon">📋</div><p>No hay menús todavía.</p></div>`;return;}
   g.innerHTML=f.map(m=>{
     const ps=m.menu_pasos||[];
@@ -2437,7 +2440,7 @@ function renderReq(){
     const est=estadoPedido(r);
     const badge=`<span class="req-badge ${est.claseBadge}">${est.icon?est.icon+' ':''}${est.label}</span>`;
     const editor=r.actualizado_por?USERS_MAP[r.actualizado_por]:null;
-    const aud=editor?`<div style="font-size:10px;color:var(--gray);margin-top:6px">✏ Última edición: ${editor}</div>`:'';
+    const aud=editor?`<div style="font-size:9px;color:var(--gray);margin-top:4px;opacity:0.7">✏ Última edición: ${editor}</div>`:'';
     return `<div class="req-card ${est.claseCard}" onclick="abrirReq(${r.id})">
       <div class="req-card-hdr">
         <span class="req-card-id">Pedido #${r.id}</span>
