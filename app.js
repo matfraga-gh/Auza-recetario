@@ -1,3 +1,4 @@
+/* ===== BUILD 2026-07-02-B | ULTIMA VERSION | incluye: panel auditor + 6 KPIs (Prom pax/vtas x turno) + moneda USD Cobos + timeout API + arrastre de objetivo ===== */
 /* ============================================
    AZUCAPP - Lógica principal
 ============================================ */
