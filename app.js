@@ -7396,9 +7396,22 @@ function ccTurnoLabel(t) { const f = CIERRE_CAJA_TURNOS.find(x => x[0] === t); r
 
 let CC_LOCAL_FILTRO = '', CC_LISTA = [], CC_EDIT = null;
 
+function tcUsd() { return parseFloat((PROP_CONFIG || {}).cambio_usd) || 0; }
+function ventasPesos(c) {
+  const monto = parseFloat(c && c.ventas_total) || 0;
+  return (c && c.moneda === 'USD') ? monto * tcUsd() : monto;
+}
+async function asegurarPropConfig() {
+  if (PROP_CONFIG) return;
+  try { const d = await api('propinas_config?id=eq.1'); PROP_CONFIG = (d && d[0]) ? d[0] : {}; }
+  catch (e) { PROP_CONFIG = {}; }
+}
+function esLocalUSD(loc) { return normalizar(localLabel(loc) || '').indexOf('cobos') !== -1 || normalizar(loc || '').indexOf('cobos') !== -1; }
+
 async function openMisCierres() {
   if (!puedeGestionarCierres()) { showDashboard(); return; }
   showView('vMisCierres');
+  await asegurarPropConfig();
   const locs = cierresLocalesPermitidos();
   document.getElementById('ccLocalFiltro').innerHTML = '<option value="">Todos mis locales</option>' +
     locs.map(l => '<option value="' + esc(l) + '">' + esc(LOCAL_LABELS[l] || l) + '</option>').join('');
@@ -7431,13 +7444,15 @@ function renderCierres() {
   if (!CC_LISTA.length) { lista.innerHTML = '<div class="empty-list">No hay cierres cargados todav\u00eda.</div>'; return; }
   const puedeEd = puedeEditarCierres();
   lista.innerHTML = CC_LISTA.map(c => {
-    const prom = (c.pax && c.pax > 0) ? (c.ventas_total / c.pax) : null;
+    const vp = ventasPesos(c);
+    const prom = (c.pax && c.pax > 0) ? (vp / c.pax) : null;
+    const usdTag = (c.moneda === 'USD') ? (' · USD ' + formatNumber(c.ventas_total || 0)) : '';
     const click = puedeEd ? ' onclick="abrirEditarCierreCaja(' + c.id + ')" style="cursor:pointer"' : '';
     return '<div class="ped-card"' + click + '>' +
       '<div class="ped-card-top"><span class="ped-local">' + esc(LOCAL_LABELS[c.local] || c.local) + '</span>' +
-      '<span class="cc-venta">$' + formatNumber(c.ventas_total || 0) + '</span></div>' +
+      '<span class="cc-venta">$' + formatNumber(vp) + '</span></div>' +
       '<div class="ped-card-sub">' + pedFecha(c.fecha) + ' \u00b7 ' + esc(ccTurnoLabel(c.turno)) + ' \u00b7 ' + (c.pax || 0) + ' pax' +
-      (prom != null ? (' \u00b7 $' + formatNumber(prom) + '/pax') : '') + '</div></div>';
+      (prom != null ? (' \u00b7 $' + formatNumber(prom) + '/pax') : '') + usdTag + '</div></div>';
   }).join('');
 }
 
@@ -7448,6 +7463,8 @@ window.abrirNuevoCierreCaja = function() {
   document.getElementById('ccModalTitulo').textContent = 'Nuevo cierre';
   document.getElementById('ccLocal').innerHTML = locs.map(l => '<option value="' + esc(l) + '">' + esc(LOCAL_LABELS[l] || l) + '</option>').join('');
   document.getElementById('ccLocal').disabled = false;
+  document.getElementById('ccLocal').onchange = function() { document.getElementById('ccMoneda').value = esLocalUSD(this.value) ? 'USD' : 'ARS'; ccCalcProm(); };
+  document.getElementById('ccMoneda').value = esLocalUSD(document.getElementById('ccLocal').value) ? 'USD' : 'ARS';
   document.getElementById('ccFecha').value = hoyStr();
   document.getElementById('ccTurno').innerHTML = CIERRE_CAJA_TURNOS.map(t => '<option value="' + t[0] + '"' + (t[0] === 'noche' ? ' selected' : '') + '>' + t[1] + '</option>').join('');
   document.getElementById('ccVentas').value = '';
@@ -7456,6 +7473,7 @@ window.abrirNuevoCierreCaja = function() {
   document.getElementById('ccProm').textContent = '';
   document.getElementById('ccError').textContent = '';
   document.getElementById('ccBorrarBtn').style.display = 'none';
+  ccCalcProm();
   document.getElementById('modalCierreCaja').classList.add('show');
 };
 window.abrirEditarCierreCaja = function(id) {
@@ -7468,6 +7486,7 @@ window.abrirEditarCierreCaja = function(id) {
   document.getElementById('ccLocal').disabled = true;
   document.getElementById('ccFecha').value = c.fecha ? String(c.fecha).slice(0, 10) : hoyStr();
   document.getElementById('ccTurno').innerHTML = CIERRE_CAJA_TURNOS.map(t => '<option value="' + t[0] + '"' + (t[0] === c.turno ? ' selected' : '') + '>' + t[1] + '</option>').join('');
+  document.getElementById('ccMoneda').value = c.moneda || 'ARS';
   setMoneyVal('ccVentas', c.ventas_total);
   document.getElementById('ccPax').value = c.pax != null ? c.pax : '';
   document.getElementById('ccObs').value = c.observaciones || '';
@@ -7480,9 +7499,17 @@ window.closeCierreCaja = function() { document.getElementById('modalCierreCaja')
 window.ccCalcProm = function() {
   const v = parseMiles(document.getElementById('ccVentas').value);
   const p = parseInt(document.getElementById('ccPax').value, 10);
+  const moneda = (document.getElementById('ccMoneda') || {}).value || 'ARS';
   const el = document.getElementById('ccProm');
-  if (!isNaN(v) && !isNaN(p) && p > 0) el.textContent = 'Promedio por pax: $' + formatNumber(v / p);
-  else el.textContent = '';
+  let txt = '';
+  if (moneda === 'USD') {
+    const tc = tcUsd();
+    if (tc > 0) txt += 'TC $' + formatNumber(tc) + '/USD · equivale a $' + formatNumber(v * tc) + ' pesos. ';
+    else txt += '⚠ Falta cargar el tipo de cambio en Propinas. ';
+  }
+  const base = moneda === 'USD' ? (v * tcUsd()) : v;
+  if (!isNaN(v) && !isNaN(p) && p > 0) txt += 'Promedio por pax: $' + formatNumber(base / p);
+  el.textContent = txt;
 };
 window.guardarCierreCaja = async function() {
   const err = document.getElementById('ccError'); err.textContent = '';
@@ -7490,12 +7517,14 @@ window.guardarCierreCaja = async function() {
   const fecha = document.getElementById('ccFecha').value;
   const turno = document.getElementById('ccTurno').value;
   const ventas = parseMiles(document.getElementById('ccVentas').value);
+  const moneda = (document.getElementById('ccMoneda') || {}).value || 'ARS';
   const pax = parseInt(document.getElementById('ccPax').value, 10);
   if (!local) { err.textContent = 'Eleg\u00ed un local.'; return; }
   if (!fecha) { err.textContent = 'Eleg\u00ed la fecha.'; return; }
   if (isNaN(ventas) || ventas < 0) { err.textContent = 'Carg\u00e1 las ventas totales.'; return; }
   if (isNaN(pax) || pax < 0) { err.textContent = 'Carg\u00e1 la cantidad de pax.'; return; }
-  const payload = { local: local, fecha: fecha, turno: turno, ventas_total: ventas, pax: pax, observaciones: document.getElementById('ccObs').value.trim() || null };
+  if (moneda === 'USD' && tcUsd() <= 0) { err.textContent = 'Cargá primero el tipo de cambio (USD) en Propinas → Configuración.'; return; }
+  const payload = { local: local, fecha: fecha, turno: turno, ventas_total: ventas, pax: pax, moneda: moneda, observaciones: document.getElementById('ccObs').value.trim() || null };
   const btn = document.getElementById('ccGuardarBtn'); btn.disabled = true; const t = btn.textContent; btn.textContent = 'Guardando...';
   try {
     if (CC_EDIT) {
@@ -7695,6 +7724,7 @@ function _pvRango(mes) {
 async function cargarPanelVentas() {
   const body = document.getElementById('pvBody');
   body.innerHTML = '<div class="loading">Cargando...</div>';
+  await asegurarPropConfig();
   const loc = PV_LOCAL;
   if (!loc) { body.innerHTML = '<div class="empty-list">No tenés un local asignado para ver.</div>'; return; }
   const agregado = esLocalAgregado(loc);
@@ -7727,7 +7757,7 @@ async function cargarPanelVentas() {
     const sd = new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1);
     const evolDesde = sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0') + '-01';
     const evolData = await api('cierres_caja?' + locFilter +
-      '&fecha=gte.' + evolDesde + '&select=fecha,ventas_total&order=fecha.asc') || [];
+      '&fecha=gte.' + evolDesde + '&select=fecha,ventas_total,moneda&order=fecha.asc') || [];
     renderPanelVentas(cierres, objetivo, evolData, objetivoHeredado, agregado);
   } catch (e) {
     body.innerHTML = '<div class="empty-list" style="color:var(--c-error)">No se pudieron cargar los datos.<br><span style="font-size:11px;opacity:.7">' + esc(String((e && e.message) || e)) + '</span></div>';
@@ -7738,7 +7768,7 @@ function _pvMoney(n) { return '$' + formatNumber(n); }
 
 function renderPanelVentas(cierres, objetivo, evolData, objetivoHeredado, agregado) {
   const body = document.getElementById('pvBody');
-  const brutoVentas = cierres.reduce(function(s, c) { return s + (parseFloat(c.ventas_total) || 0); }, 0);
+  const brutoVentas = cierres.reduce(function(s, c) { return s + ventasPesos(c); }, 0);
   const pax = cierres.reduce(function(s, c) { return s + (parseInt(c.pax, 10) || 0); }, 0);
   const netoVentas = brutoVentas / IVA_COEF;
   const promBruto = pax > 0 ? brutoVentas / pax : null;
@@ -7787,7 +7817,7 @@ function renderPanelVentas(cierres, objetivo, evolData, objetivoHeredado, agrega
   html += '</div>';
 
   const porMes = {};
-  evolData.forEach(function(c) { const k = String(c.fecha).slice(0, 7); porMes[k] = (porMes[k] || 0) + (parseFloat(c.ventas_total) || 0); });
+  evolData.forEach(function(c) { const k = String(c.fecha).slice(0, 7); porMes[k] = (porMes[k] || 0) + ventasPesos(c); });
   const hoy = new Date();
   const meses = [];
   for (let i = 5; i >= 0; i--) {
@@ -7811,14 +7841,14 @@ function renderPanelVentas(cierres, objetivo, evolData, objetivoHeredado, agrega
     html += '<div class="empty-list">No hay cierres cargados en este mes.</div>';
   } else {
     html += '<div class="pv-detalle">' + cierres.map(function(c) {
-      const v = parseFloat(c.ventas_total) || 0;
+      const v = ventasPesos(c);
       const p = parseInt(c.pax, 10) || 0;
       const pr = p > 0 ? v / p : null;
       const obs = c.observaciones ? '<div class="pv-det-obs"><i class="ti ti-message-circle"></i> ' + esc(c.observaciones) + '</div>' : '';
       return '<div class="pv-det-row">' +
         '<div class="pv-det-top"><span class="pv-det-fecha">' + (agregado ? esc(localLabel(c.local)) + ' · ' : '') + fmtFechaCorta(String(c.fecha).slice(0, 10)) + ' · ' + esc(ccTurnoLabel(c.turno)) + '</span>' +
         '<span class="pv-det-venta">' + _pvMoney(v) + '</span></div>' +
-        '<div class="pv-det-sub">' + p + ' comensales' + (pr != null ? ' · ' + _pvMoney(pr) + '/comensal · neto ' + _pvMoney(v / IVA_COEF) : '') + '</div>' +
+        '<div class="pv-det-sub">' + p + ' comensales' + (pr != null ? ' · ' + _pvMoney(pr) + '/comensal · neto ' + _pvMoney(v / IVA_COEF) : '') + (c.moneda === 'USD' ? ' · USD ' + formatNumber(c.ventas_total || 0) : '') + '</div>' +
         obs +
       '</div>';
     }).join('') + '</div>';
@@ -7908,6 +7938,7 @@ async function cargarEstadisticas() {
   const elList = document.getElementById('estLista');
   elRes.innerHTML  = '<div class="loading">Cargando estadísticas...</div>';
   elList.innerHTML = '';
+  await asegurarPropConfig();
   try {
     let q = 'cierres_caja?select=*&order=fecha.desc,id.desc';
     if (EST_MES) {
@@ -7937,7 +7968,7 @@ function renderEstadisticas(data) {
     return;
   }
 
-  const totalVentas = data.reduce(function(s, c) { return s + (parseFloat(c.ventas_total) || 0); }, 0);
+  const totalVentas = data.reduce(function(s, c) { return s + ventasPesos(c); }, 0);
   const totalPax    = data.reduce(function(s, c) { return s + (parseInt(c.pax, 10) || 0); }, 0);
   const promGlobal  = totalPax > 0 ? totalVentas / totalPax : null;
 
@@ -7955,7 +7986,7 @@ function renderEstadisticas(data) {
     const porLocal = {};
     data.forEach(function(c) {
       if (!porLocal[c.local]) porLocal[c.local] = { ventas: 0, pax: 0 };
-      porLocal[c.local].ventas += parseFloat(c.ventas_total) || 0;
+      porLocal[c.local].ventas += ventasPesos(c);
       porLocal[c.local].pax    += parseInt(c.pax, 10) || 0;
     });
     const locs = Object.keys(porLocal).sort(function(a, b) { return porLocal[b].ventas - porLocal[a].ventas; });
@@ -7977,7 +8008,7 @@ function renderEstadisticas(data) {
 
   html += '<div class="est-section-title">Cierres del período</div>' +
     data.map(function(c) {
-      const prom = (c.pax && c.pax > 0) ? c.ventas_total / c.pax : null;
+      const prom = (c.pax && c.pax > 0) ? ventasPesos(c) / c.pax : null;
       return '<div class="ped-sub">' +
           pedFecha(c.fecha) + ' · ' + esc(ccTurnoLabel(c.turno)) + ' · ' + (c.pax || 0) + ' pax' +
           (prom != null ? ' · $' + formatNumber(prom) + '/pax' : '') +

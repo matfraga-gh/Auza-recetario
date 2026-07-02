@@ -2,6 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="theme-color" content="#1C1A17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AZUCAPP">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#1C1A17">
 <title>AZUCAPP · Gestión interna de Azuca</title>
@@ -111,6 +118,8 @@
 
     <div class="dash-grid" id="dashGrid"></div>
 
+    <button class="dash-logout" onclick="doLogout()"><i class="ti ti-logout"></i> Cerrar sesión</button>
+
   </div>
 </div>
 
@@ -136,15 +145,20 @@
     <!-- KPIs -->
     <div class="kpi-grid" id="propGestKpis"></div>
 
+    <!-- Acciones: Exportar + Nuevo cierre (siempre visibles, antes de la tabla) -->
+    <div style="display:flex; gap:10px; margin-bottom:14px; align-items:center;">
+      <div id="propExportWrap" style="display:none;">
+        <button class="btn-ghost" onclick="abrirLiquidacion()"><i class="ti ti-file-spreadsheet"></i> Exportar liquidación</button>
+      </div>
+      <button class="btn-primary" id="propGestNuevoBtn" onclick="abrirNuevoCierre()" style="margin-left:auto;">
+        <i class="ti ti-plus"></i> Nuevo cierre
+      </button>
+    </div>
+
     <!-- Tabla de cierres -->
     <div id="propGestTabla">
       <div class="loading">Cargando cierres...</div>
     </div>
-
-    <!-- Botón de nuevo cierre (placeholder hasta Fase 2) -->
-    <button class="btn-primary-full" id="propGestNuevoBtn" onclick="nuevoCierrePlaceholder()" style="margin-top:14px;">
-      <i class="ti ti-plus"></i> Nuevo cierre
-    </button>
 
   </div>
 </div>
@@ -385,6 +399,7 @@
         <option value="admin">Admin</option>
         <option value="editor">Editor</option>
         <option value="usuario">Usuario</option>
+        <option value="auditor">Auditor</option>
         <option value="sinacceso">Sin acceso</option>
       </select>
     </div>
@@ -431,6 +446,27 @@
 <!-- ============================================
      VISTA: ADMINISTRACIÓN - Locales
 ============================================ -->
+<!-- ============================================
+     VISTA: PLANTILLAS DE ROSTERS (Admin)
+============================================ -->
+<div id="vPlantillasRosters" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="openAdministracion()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Plantillas de Rosters</div>
+        <div class="module-subtitle" id="plantillasCount">Cargando...</div>
+      </div>
+    </div>
+    <div class="info-banner" style="margin-top:0;margin-bottom:14px;">
+      <i class="ti ti-info-circle"></i>
+      <span>Los editores usan estas plantillas al armar la semana, para no cargar día por día. Un día en “—” queda vacío para completar a mano.</span>
+    </div>
+    <button class="btn-primary" style="width:100%;margin-bottom:14px;" onclick="abrirNuevaPlantilla()"><i class="ti ti-plus"></i> Nueva plantilla</button>
+    <div id="plantillasLista"><div class="loading">Cargando...</div></div>
+  </div>
+</div>
+
 <div id="vAdminLocales" class="view">
   <div class="module-wrap">
 
@@ -459,7 +495,7 @@
 <!-- ============================================
      MODAL: EDITAR LOCAL
 ============================================ -->
-<div id="modalLocal" class="modal-overlay" style="display:none">
+<div id="modalLocal" class="modal-overlay">
   <div class="modal-card modal-bib-cat">
     <div class="modal-header">
       <div class="modal-title">Editar local</div>
@@ -509,14 +545,14 @@
   <div class="module-wrap">
 
     <div class="module-header">
-      <button class="btn-back" onclick="openAdministracion()" aria-label="Volver">
+      <button class="btn-back" onclick="volverDeInsumos()" aria-label="Volver">
         <i class="ti ti-arrow-left"></i>
       </button>
       <div class="module-title-block">
         <div class="module-title">Insumos</div>
         <div class="module-subtitle" id="insumosCount">Cargando...</div>
       </div>
-      <button class="btn-config-propinas" onclick="openMenuGestion()" title="Gestionar subfamilias y proveedores">
+      <button class="btn-config-propinas" id="insumoGearBtn" onclick="openMenuGestion()" title="Gestionar subfamilias y proveedores">
         <i class="ti ti-settings"></i>
       </button>
     </div>
@@ -527,7 +563,7 @@
     </div>
 
     <!-- Botón crear nuevo -->
-    <button class="btn-primary-full" onclick="openModalInsumo(null)">
+    <button class="btn-primary-full" id="insumoNuevoBtn" onclick="openModalInsumo(null)">
       <i class="ti ti-plus"></i> Nuevo insumo
     </button>
 
@@ -547,6 +583,15 @@
       </div>
     </div>
 
+    <!-- Contador + acciones -->
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+      <span id="insumosCountInline" style="font-size:13px; color:var(--c-sand); font-weight:600;">—</span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-ghost" onclick="limpiarFiltrosInsumos()"><i class="ti ti-filter-off"></i> Limpiar</button>
+        <button class="btn-ghost" id="insumoExportBtn" onclick="exportarInsumosExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
+      </div>
+    </div>
+
     <!-- Lista -->
     <div id="insumosLista">
       <div class="loading">Cargando insumos...</div>
@@ -561,7 +606,7 @@
 <!-- ============================================
      MODAL: CREAR / EDITAR INSUMO
 ============================================ -->
-<div id="modalInsumo" class="modal-overlay" style="display:none">
+<div id="modalInsumo" class="modal-overlay">
   <div class="modal-card modal-bib">
     <div class="modal-header">
       <div class="modal-title" id="modalInsumoTitle">Nuevo insumo</div>
@@ -603,7 +648,7 @@
       <div class="form-row-2">
         <div class="form-group">
           <label class="form-label">Costo del envase ($)</label>
-          <input type="number" id="insCosto" class="form-input" step="1" min="0">
+          <input type="text" inputmode="numeric" id="insCosto" class="form-input" placeholder="$ 0">
         </div>
         <div class="form-group">
           <label class="form-label">Costo / unidad base</label>
@@ -649,6 +694,120 @@
 <!-- ============================================
      MODAL: EDITAR LOCALES DE UN EDITOR
 ============================================ -->
+<!-- ============================================
+     MODAL: EDITAR TURNOS DE UN EMPLEADO
+============================================ -->
+<!-- ============================================
+     MODAL: EDITAR / NUEVA PLANTILLA
+============================================ -->
+<!-- ============================================
+     MODAL: ARTÍCULO DE STOCK (Admin)
+============================================ -->
+<!-- ============================================
+     MODAL: CIERRE DE CAJA
+============================================ -->
+<div class="modal-overlay" id="modalCierreCaja">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="ccModalTitulo">Nuevo cierre</h2>
+      <button class="modal-close" onclick="closeCierreCaja()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <label class="field"><span class="field-label">Local</span><select id="ccLocal"></select></label>
+      <label class="field"><span class="field-label">Moneda</span><select id="ccMoneda" onchange="ccCalcProm()"><option value="ARS">Pesos ($)</option><option value="USD">Dólares (USD)</option></select></label>
+      <div class="cierre-row2">
+        <label class="field"><span class="field-label">Fecha</span><input type="date" id="ccFecha"></label>
+        <label class="field"><span class="field-label">Turno</span><select id="ccTurno"></select></label>
+      </div>
+      <div class="cierre-row2">
+        <label class="field"><span class="field-label">Ventas totales ($)</span><input type="text" inputmode="numeric" id="ccVentas" placeholder="$ 0" oninput="ccCalcProm()"></label>
+        <label class="field"><span class="field-label">Pax (cubiertos)</span><input type="number" min="0" id="ccPax" oninput="ccCalcProm()"></label>
+      </div>
+      <div class="cc-prom" id="ccProm"></div>
+      <label class="field"><span class="field-label">Observaciones</span><textarea id="ccObs" rows="2" placeholder="Opcional"></textarea></label>
+      <div class="login-error" id="ccError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost ped-danger" id="ccBorrarBtn" style="display:none;" onclick="borrarCierreCaja()">Eliminar</button>
+      <button class="btn-ghost" onclick="closeCierreCaja()">Cancelar</button>
+      <button class="btn-primary" id="ccGuardarBtn" onclick="guardarCierreCaja()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalStockArticulo">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="stockArtTitulo">Nuevo artículo</h2>
+      <button class="modal-close" onclick="closeStockArticulo()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <label class="field"><span class="field-label">Nombre</span>
+        <input type="text" id="saNombre" placeholder="Ej: Copa Riedel Degustazione"></label>
+      <label class="field"><span class="field-label">Unidad de control</span>
+        <select id="saUnidad"></select></label>
+      <p class="field-label" style="margin-bottom:6px;">Locales donde se controla</p>
+      <div class="locales-grid" id="saLocalesGrid"></div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
+        <input type="checkbox" id="saActivo" checked style="width:auto;">
+        <span class="field-label" style="margin:0;">Artículo activo</span>
+      </label>
+      <div class="login-error" id="saError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeStockArticulo()">Cancelar</button>
+      <button class="btn-primary" id="saGuardarBtn" onclick="guardarStockArticulo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalPlantilla">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="plantillaModalTitulo">Nueva plantilla</h2>
+      <button class="modal-close" onclick="closePlantillaModal()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <label class="field"><span class="field-label">Nombre</span>
+        <input type="text" id="plNombre" placeholder="Ej: Cocina mañana"></label>
+      <label class="field"><span class="field-label">Local</span>
+        <select id="plLocal"></select></label>
+      <div id="plDias" style="margin-top:6px;"></div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-top:10px;cursor:pointer;">
+        <input type="checkbox" id="plActivo" checked style="width:auto;">
+        <span class="field-label" style="margin:0;">Plantilla activa (disponible para usar)</span>
+      </label>
+      <div class="login-error" id="plError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closePlantillaModal()">Cancelar</button>
+      <button class="btn-primary" id="plGuardarBtn" onclick="guardarPlantilla()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalEditarTurnos">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="rostEmpNombre">Turnos</h2>
+      <button class="modal-close" onclick="closeEditarTurnosModal()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text" id="rostEmpSemana" style="font-size:12px;color:var(--c-muted);margin-top:0;">—</p>
+      <div class="rost-plantilla-row" id="rostPlantillaRow">
+        <select id="rostPlantilla"></select>
+        <button type="button" class="btn-ghost" onclick="aplicarPlantilla()"><i class="ti ti-wand"></i> Aplicar</button>
+      </div>
+      <div id="rostDias"></div>
+      <div class="login-error" id="rostError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeEditarTurnosModal()">Cancelar</button>
+      <button class="btn-primary" id="rostGuardarBtn" onclick="guardarTurnosEmp()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalLocales">
   <div class="modal-card">
     <div class="modal-header">
@@ -711,12 +870,21 @@
           <option value="usuario">Usuario (colaborador común)</option>
           <option value="editor">Editor</option>
           <option value="admin">Admin (gestión completa)</option>
+          <option value="auditor">Auditor (solo panel de ventas)</option>
           <option value="master" id="optMaster">Master (máximo nivel)</option>
         </select>
         <small class="field-hint" id="userPerfilHint">El perfil define qué puede hacer la persona.</small>
       </label>
 
-      <label class="field">
+      <!-- Al CREAR: selector de locales (auto-crea empleado) -->
+      <div class="field" id="userLocalesField">
+        <span class="field-label">Local(es) asignado(s)</span>
+        <div id="userLocalesGrid" class="locales-grid-inline"></div>
+        <small class="field-hint">Se crea automáticamente la ficha del colaborador con estos locales.</small>
+      </div>
+
+      <!-- Al EDITAR: vincular a empleado existente -->
+      <label class="field" id="userEmpleadoField" style="display:none;">
         <span class="field-label">Vincular a colaborador</span>
         <select id="userEmpleado">
           <option value="">Sin vincular (no tiene turnos)</option>
@@ -816,6 +984,25 @@
 <!-- ============================================
      MODAL: DETALLE DE INCIDENCIA
 ============================================ -->
+<div class="modal-overlay" id="modalResolverInc">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="giResTitulo">Incidencia</h2>
+      <button class="modal-close" onclick="closeResolverInc()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="giResInfo"></div>
+      <label class="field" style="margin-top:12px;"><span class="field-label">Comentario de respuesta (opcional)</span>
+        <textarea id="giResComent" rows="3" placeholder="Ej: dale, avisá con más tiempo la próxima"></textarea></label>
+      <div class="login-error" id="giResError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost ped-danger" onclick="rechazarIncidencia()">✗ Rechazar</button>
+      <button class="btn-primary" onclick="aceptarIncidencia()">✓ Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalIncDetalle">
   <div class="modal-card">
     <div class="modal-header">
@@ -881,6 +1068,9 @@
       <button class="bib-tab" id="bibTabCategorias" onclick="switchBibTab('categorias')" style="display:none">
         <i class="ti ti-folders"></i> Categorías
       </button>
+      <button class="bib-tab" id="bibTabAcademia" onclick="switchBibTab('academia')" style="display:none">
+        <i class="ti ti-school"></i> Academia
+      </button>
     </div>
 
     <!-- Tab contenidos -->
@@ -903,13 +1093,27 @@
       </div>
     </div>
 
+    <!-- Tab academia -->
+    <div id="bibPanelAcademia" style="display:none">
+      <div class="bib-tabs" style="margin-bottom:14px">
+        <button class="bib-tab active" id="acadSubTab_papers"   onclick="switchAcademiaSubTab('papers')">
+          <i class="ti ti-books"></i> Papers
+        </button>
+        <button class="bib-tab"        id="acadSubTab_progreso" onclick="switchAcademiaSubTab('progreso')">
+          <i class="ti ti-chart-bar"></i> Progreso
+        </button>
+      </div>
+      <div id="acadPanelPapers"></div>
+      <div id="acadPanel_progreso" style="display:none"></div>
+    </div>
+
   </div>
 </div>
 
 <!-- ============================================
      MODAL: AGREGAR / EDITAR CONTENIDO
 ============================================ -->
-<div id="modalContenido" class="modal-overlay" style="display:none">
+<div id="modalContenido" class="modal-overlay">
   <div class="modal-card modal-bib">
     <div class="modal-header">
       <div class="modal-title" id="modalContenidoTitle">Nuevo contenido</div>
@@ -956,7 +1160,7 @@
 <!-- ============================================
      MODAL: AGREGAR / EDITAR CATEGORÍA
 ============================================ -->
-<div id="modalCategoria" class="modal-overlay" style="display:none">
+<div id="modalCategoria" class="modal-overlay">
   <div class="modal-card modal-bib-cat">
     <div class="modal-header">
       <div class="modal-title" id="modalCategoriaTitle">Nueva categoría</div>
@@ -987,7 +1191,7 @@
 <!-- ============================================
      MODAL: CONFIGURACIÓN DE PROPINAS
 ============================================ -->
-<div id="modalConfigPropinas" class="modal-overlay" style="display:none">
+<div id="modalConfigPropinas" class="modal-overlay">
   <div class="modal-card modal-bib">
     <div class="modal-header">
       <div class="modal-title">Configurar Propinas</div>
@@ -1040,7 +1244,7 @@
 <!-- ============================================
      MODAL: MENÚ DE GESTIÓN (subfamilias / proveedores)
 ============================================ -->
-<div id="modalMenuGestion" class="modal-overlay" style="display:none">
+<div id="modalMenuGestion" class="modal-overlay">
   <div class="modal-card modal-bib-cat">
     <div class="modal-header">
       <div class="modal-title">¿Qué querés gestionar?</div>
@@ -1078,7 +1282,7 @@
 <!-- ============================================
      MODAL: GESTIÓN DE SUBFAMILIAS
 ============================================ -->
-<div id="modalSubfamilias" class="modal-overlay" style="display:none">
+<div id="modalSubfamilias" class="modal-overlay">
   <div class="modal-card modal-bib">
     <div class="modal-header">
       <div class="modal-title">Gestionar subfamilias</div>
@@ -1106,7 +1310,7 @@
 <!-- ============================================
      MODAL: RENOMBRAR / FUSIONAR SUBFAMILIA
 ============================================ -->
-<div id="modalRenombrarSubfam" class="modal-overlay" style="display:none">
+<div id="modalRenombrarSubfam" class="modal-overlay">
   <div class="modal-card modal-bib-cat">
     <div class="modal-header">
       <div class="modal-title" id="renombrarSubfamTitle">Renombrar subfamilia</div>
@@ -1140,7 +1344,7 @@
 <!-- ============================================
      MODAL: GESTIÓN DE PROVEEDORES
 ============================================ -->
-<div id="modalProveedores" class="modal-overlay" style="display:none">
+<div id="modalProveedores" class="modal-overlay">
   <div class="modal-card modal-bib">
     <div class="modal-header">
       <div class="modal-title">Gestionar proveedores</div>
@@ -1168,7 +1372,7 @@
 <!-- ============================================
      MODAL: RENOMBRAR / FUSIONAR PROVEEDOR
 ============================================ -->
-<div id="modalRenombrarProv" class="modal-overlay" style="display:none">
+<div id="modalRenombrarProv" class="modal-overlay">
   <div class="modal-card modal-bib-cat">
     <div class="modal-header">
       <div class="modal-title">Renombrar proveedor</div>
@@ -1202,7 +1406,7 @@
 <!-- ============================================
      MODAL: CONFIRMACIÓN / ALERTA UNIVERSAL
 ============================================ -->
-<div id="modalConfirm" class="modal-overlay" style="display:none">
+<div id="modalConfirm" class="modal-overlay">
   <div class="modal-card modal-confirm" data-prevent-close>
     <div class="modal-confirm-icon" id="confirmIcon">
       <i class="ti ti-alert-circle"></i>
@@ -1232,6 +1436,56 @@
     <div class="modal-body" id="fichaBody"></div>
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeFichaModal()">Cerrar</button>
+      <button class="btn-primary" id="fichaEditarBtn" style="display:none;" onclick="editarDesdeFicha()"><i class="ti ti-edit"></i> Editar datos</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MODAL: EDITAR FICHA (Admin/Master)
+============================================ -->
+<div class="modal-overlay" id="modalEditarFicha">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Editar ficha</h2>
+      <button class="modal-close" onclick="closeEditarFichaModal()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text" id="efPersonaNombre" style="font-weight:600;">—</p>
+      <div class="cierre-row2">
+        <label class="field"><span class="field-label">Nombre</span>
+          <input type="text" id="efNombre"></label>
+        <label class="field"><span class="field-label">Apellido</span>
+          <input type="text" id="efApellido"></label>
+      </div>
+      <div class="cierre-row2">
+        <label class="field"><span class="field-label">Sector</span>
+          <input type="text" id="efSector" list="efSectorList" placeholder="Ej: Cocina, Salón"></label>
+        <label class="field"><span class="field-label">Categoría</span>
+          <input type="text" id="efCategoria" list="efCategoriaList" placeholder="Ej: Mozo, Cocinero"></label>
+      </div>
+      <datalist id="efSectorList"></datalist>
+      <datalist id="efCategoriaList"></datalist>
+      <label class="field"><span class="field-label">Local principal</span>
+        <select id="efLocal"></select></label>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-top:10px;cursor:pointer;">
+        <input type="checkbox" id="efMultilocal" style="width:auto;">
+        <span class="field-label" style="margin:0;">Multilocal (se marca solo según los locales asignados)</span>
+      </label>
+
+      <div id="efLocalesSection" style="margin-top:16px;">
+        <p class="field-label" style="margin-bottom:4px;">Locales asignados</p>
+        <p class="modal-text" style="font-size:12px;color:var(--c-muted);margin-top:0;">
+          Locales donde esta persona puede operar además del principal (multilocal y editores).
+        </p>
+        <div class="locales-grid" id="efLocalesGrid"></div>
+      </div>
+
+      <div class="login-error" id="efError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeEditarFichaModal()">Cancelar</button>
+      <button class="btn-primary" id="efGuardarBtn" onclick="guardarEditarFicha()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1255,6 +1509,7 @@
           <option value="usuario">Usuario (colaborador común)</option>
           <option value="editor">Editor</option>
           <option value="admin">Admin (gestión completa)</option>
+          <option value="auditor">Auditor (solo panel de ventas)</option>
           <option value="master" id="cpOptMaster">Master (máximo nivel)</option>
         </select>
       </label>
@@ -1263,6 +1518,644 @@
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeCambiarPerfilModal()">Cancelar</button>
       <button class="btn-primary" id="btnGuardarPerfil" onclick="guardarCambioPerfil()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MODAL: NUEVO CIERRE DE PROPINAS (Fase 2)
+============================================ -->
+<div class="modal-overlay" id="modalNuevoCierre">
+  <div class="modal-card cierre-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="cierreModalTitulo">Nuevo cierre</h2>
+      <button class="modal-close" onclick="closeNuevoCierre()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body cierre-body">
+
+      <div class="cierre-section">
+        <div class="cierre-row2">
+          <label class="field"><span class="field-label">Local</span>
+            <input type="text" id="cierreLocal" readonly></label>
+          <label class="field"><span class="field-label">Fecha</span>
+            <input type="date" id="cierreFecha"></label>
+        </div>
+        <label class="field"><span class="field-label">Turno</span>
+          <select id="cierreTurno">
+            <option value="mediodia">🍲 Mediodía</option>
+            <option value="noche">🌙 Noche</option>
+            <option value="evento">🎉 Evento</option>
+            <option value="especial">⭐ Especial</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="cierre-section">
+        <div class="cierre-section-title"><i class="ti ti-cash"></i> Efectivo (cantidad de billetes)</div>
+        <div class="billete-grid" id="cierreBilletes"></div>
+      </div>
+
+      <div class="cierre-section">
+        <div class="cierre-section-title"><i class="ti ti-currency-dollar"></i> Moneda extranjera</div>
+        <div class="cierre-row3">
+          <label class="field"><span class="field-label">USD</span><input type="number" min="0" step="any" id="cierreUsd" placeholder="0" oninput="recalcCierre()"></label>
+          <label class="field"><span class="field-label">EUR</span><input type="number" min="0" step="any" id="cierreEur" placeholder="0" oninput="recalcCierre()"></label>
+          <label class="field"><span class="field-label">BRL</span><input type="number" min="0" step="any" id="cierreBrl" placeholder="0" oninput="recalcCierre()"></label>
+        </div>
+        <div class="cierre-hint" id="cierreTcHint"></div>
+      </div>
+
+      <div class="cierre-section">
+        <div class="cierre-section-title"><i class="ti ti-credit-card"></i> Electrónicos</div>
+        <div class="cierre-row2">
+          <label class="field"><span class="field-label">Tarjeta</span><input type="text" inputmode="numeric" id="cierreTarjeta" placeholder="$ 0" oninput="recalcCierre()"></label>
+          <label class="field"><span class="field-label">Transferencia</span><input type="text" inputmode="numeric" id="cierreTransf" placeholder="$ 0" oninput="recalcCierre()"></label>
+        </div>
+      </div>
+
+      <div class="cierre-resumen" id="cierreResumen"></div>
+
+      <div class="cierre-section">
+        <div class="cierre-section-title"><i class="ti ti-users"></i> Colaboradores · puntos</div>
+        <div class="colab-list" id="cierreColabs"><div class="loading">Cargando...</div></div>
+      </div>
+
+      <label class="field"><span class="field-label">Comentario (opcional)</span>
+        <textarea id="cierreComentario" rows="2"></textarea></label>
+
+      <div class="login-error" id="cierreError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeNuevoCierre()">Cancelar</button>
+      <button class="btn-primary" id="btnGuardarCierre" onclick="guardarCierre()">Guardar cierre</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MODAL: EXPORTAR LIQUIDACIÓN DE PROPINAS
+============================================ -->
+<div class="modal-overlay" id="modalLiquidacion">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Exportar liquidación</h2>
+      <button class="modal-close" onclick="closeLiquidacion()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--c-muted); font-size:13px; margin-bottom:12px;">Elegí el período. El Excel trae todos los locales que podés ver, con el detalle por cierre y el total por empleado.</p>
+      <div class="cierre-row2">
+        <label class="field"><span class="field-label">Desde</span><input type="date" id="liqDesde"></label>
+        <label class="field"><span class="field-label">Hasta</span><input type="date" id="liqHasta"></label>
+      </div>
+      <div class="login-error" id="liqError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeLiquidacion()">Cancelar</button>
+      <button class="btn-primary" id="btnGenerarLiq" onclick="generarLiquidacion()">Generar Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: MIS RECETAS - Sub-elaboraciones
+============================================ -->
+<!-- ============================================
+     VISTA: MIS DATOS
+============================================ -->
+<!-- ============================================
+     VISTA: HISTORIAL DE CAMBIOS
+============================================ -->
+<div id="vHistorial" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="openAdministracion()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Historial</div>
+        <div class="module-subtitle">Auditoría de cambios</div>
+      </div>
+    </div>
+    <label class="field"><span class="field-label">Módulo</span>
+      <select id="histModuloFiltro" onchange="onFiltroHistorial()">
+        <option value="">Todos los módulos</option>
+        <option value="Rosters">Rosters</option>
+        <option value="Cierres">Cierres de caja</option>
+        <option value="Propinas">Propinas</option>
+        <option value="Recetas">Recetas</option>
+      </select>
+    </label>
+    <div id="histLista"><div class="loading">Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: MIS ESTADÍSTICAS
+============================================ -->
+<div id="vMisEstadisticas" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Mis Estadísticas</div>
+        <div class="module-subtitle">Ventas, pax y promedio por local</div>
+      </div>
+    </div>
+    <div class="est-filtros">
+      <label class="field" style="flex:1;min-width:0"><span class="field-label">Mes</span>
+        <select id="estMes" onchange="onFiltroEst()"></select>
+      </label>
+      <label class="field" style="flex:1;min-width:0"><span class="field-label">Local</span>
+        <select id="estLocal" onchange="onFiltroEst()"></select>
+      </label>
+    </div>
+    <div id="estResumen"></div>
+    <div id="estLista"></div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: PANEL DE VENTAS (auditores / admin)
+============================================ -->
+<div id="vPanelVentas" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Panel de ventas</div>
+        <div class="module-subtitle">Evolución, promedio y objetivo del mes</div>
+      </div>
+    </div>
+    <div class="est-filtros">
+      <label class="field" id="pvLocalWrap" style="flex:1;min-width:0"><span class="field-label">Local</span>
+        <select id="pvLocal" onchange="onFiltroPanel()"></select>
+      </label>
+      <label class="field" style="flex:1;min-width:0"><span class="field-label">Mes</span>
+        <select id="pvMes" onchange="onFiltroPanel()"></select>
+      </label>
+    </div>
+    <div id="pvBody"><div class="loading">Cargando...</div></div>
+  </div>
+</div>
+
+<!-- Modal: cargar/editar objetivo del mes (solo admin) -->
+<div class="modal-overlay" id="modalObjetivo">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Objetivo del mes</h2>
+      <button class="modal-close" onclick="cerrarObjetivo()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="field-hint" id="objetivoContexto">—</p>
+      <label class="field"><span class="field-label">Objetivo NETO del mes (sin IVA)</span>
+        <input type="text" inputmode="numeric" id="objetivoInput" placeholder="$ 0">
+      </label>
+      <p class="field-hint">Se guarda en neto. El bruto se calcula automáticamente (× 1,21).</p>
+      <div class="login-error" id="objetivoError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="cerrarObjetivo()">Cancelar</button>
+      <button class="btn-primary" id="objetivoGuardarBtn" onclick="guardarObjetivo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: MIS CIERRES
+============================================ -->
+<div id="vMisCierres" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Mis Cierres</div>
+        <div class="module-subtitle">Cierre de caja por local y turno</div>
+      </div>
+    </div>
+    <label class="field"><span class="field-label">Local</span>
+      <select id="ccLocalFiltro" onchange="onFiltroCierres()"></select></label>
+    <button class="btn-primary" id="ccNuevoBtn" style="width:100%;margin:12px 0 14px;" onclick="abrirNuevoCierreCaja()"><i class="ti ti-plus"></i> Nuevo cierre</button>
+    <div id="cierresLista"><div class="loading">Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: MI STOCK
+============================================ -->
+<div id="vMiStock" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Mi Stock</div>
+        <div class="module-subtitle">Control de stock por local</div>
+      </div>
+    </div>
+    <div id="stockTabs" class="stock-tabs" style="display:none;">
+      <button class="stock-tab active" data-tab="cargar" onclick="stockCambiarTab('cargar')">Cargar</button>
+      <button class="stock-tab" data-tab="articulos" onclick="stockCambiarTab('articulos')">Artículos</button>
+      <button class="stock-tab" data-tab="reportes" onclick="stockCambiarTab('reportes')">Reportes</button>
+    </div>
+    <div id="stockBody"></div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: MIS PEDIDOS
+============================================ -->
+<div id="vMisPedidos" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Mis pedidos</div>
+        <div class="module-subtitle">Requerimientos de insumos</div>
+      </div>
+    </div>
+    <div class="ped-filtros">
+      <select id="pedLocalFiltro" onchange="onFiltroPedidos()"></select>
+      <select id="pedEstadoFiltro" onchange="onFiltroPedidos()">
+        <option value="">Todos los estados</option>
+        <option value="borrador">Borrador</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="confirmado">Confirmado</option>
+        <option value="completado">Completado</option>
+      </select>
+    </div>
+    <button class="btn-ghost" id="pedExportBtn" style="width:100%;margin-bottom:14px;" onclick="exportarPedidosExcel()"><i class="ti ti-file-spreadsheet"></i> Descargar confirmados (Excel)</button>
+    <button class="btn-primary" id="pedNuevoBtn" style="width:100%;margin-bottom:14px;" onclick="abrirNuevoPedido()"><i class="ti ti-plus"></i> Nuevo pedido</button>
+    <div id="pedidosLista"><div class="loading">Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: EDITOR DE PEDIDO
+============================================ -->
+<div id="vPedidoEditor" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="openMisPedidos()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title" id="pedEditorTitulo">Pedido</div>
+        <div class="module-subtitle" id="pedEditorSub"></div>
+      </div>
+    </div>
+    <div id="pedEditorBody"></div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: GESTIÓN DE INCIDENCIAS
+============================================ -->
+<div id="vGestionIncidencias" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Gestión de Incidencias</div>
+        <div class="module-subtitle">Reportes del equipo para aceptar o rechazar</div>
+      </div>
+    </div>
+    <label class="field"><span class="field-label">Estado</span>
+      <select id="giEstadoFiltro" onchange="onFiltroIncidencias()">
+        <option value="pendiente">Pendientes</option>
+        <option value="aprobado">Aceptadas</option>
+        <option value="rechazado">Rechazadas</option>
+        <option value="">Todas</option>
+      </select></label>
+    <div id="incidenciasLista" style="margin-top:14px;"><div class="loading">Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ============================================
+     VISTA: GESTIÓN DE ROSTERS
+============================================ -->
+<div id="vGestionRosters" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Gestión de Rosters</div>
+        <div class="module-subtitle">Armá la semana de cada empleado</div>
+      </div>
+    </div>
+
+    <div class="rost-controls">
+      <label class="field"><span class="field-label">Local</span>
+        <select id="rostLocal" onchange="onChangeLocalRoster()"></select></label>
+      <label class="field" style="margin-top:10px;"><span class="field-label">Sector</span>
+        <select id="rostSector" onchange="onChangeSectorRoster()"></select></label>
+    </div>
+
+    <div class="week-nav">
+      <button class="week-arrow" onclick="cambiarSemanaRoster(-1)" aria-label="Semana anterior"><i class="ti ti-chevron-left"></i></button>
+      <div class="week-label" id="rostWeekLabel">—</div>
+      <button class="week-arrow" onclick="cambiarSemanaRoster(1)" aria-label="Semana siguiente"><i class="ti ti-chevron-right"></i></button>
+    </div>
+
+    <div class="rost-nota">
+      <label class="field"><span class="field-label">Nota general de la semana (la ve todo el local)</span>
+        <textarea id="rostNota" rows="2" placeholder="Opcional"></textarea></label>
+      <button class="btn-ghost rost-nota-btn" onclick="guardarNotaSemana()"><i class="ti ti-device-floppy"></i> Guardar nota</button>
+    </div>
+
+    <div id="rostLista"></div>
+  </div>
+</div>
+
+<div id="vMisDatos" class="view">
+  <div class="module-wrap">
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Mis Datos</div>
+        <div class="module-subtitle">Tus datos personales y de cobro</div>
+      </div>
+    </div>
+
+    <div id="misDatosNoFicha" class="empty-list" style="display:none;">
+      Todavía no tenés una ficha de empleado vinculada. Hablá con RRHH para que te asocien.
+    </div>
+
+    <div id="misDatosForm">
+      <div class="md-note"><i class="ti ti-info-circle"></i> Estos datos los completás y mantenés vos: sos responsable de que sean correctos. El <strong>alias</strong> se usa para el cobro de propinas.</div>
+
+      <div class="cierre-row2">
+        <label class="field"><span class="field-label">Nombre</span>
+          <input type="text" id="miNombre"></label>
+        <label class="field"><span class="field-label">Apellido</span>
+          <input type="text" id="miApellido"></label>
+      </div>
+      <div class="cierre-row2">
+        <label class="field"><span class="field-label">Documento</span>
+          <input type="text" id="miDocumento" placeholder="DNI"></label>
+        <label class="field"><span class="field-label">Fecha de nacimiento</span>
+          <input type="date" id="miFechaNac"></label>
+      </div>
+      <label class="field"><span class="field-label">Teléfono</span>
+        <input type="tel" id="miTelefono" placeholder="Ej: 261 555 1234"></label>
+      <label class="field"><span class="field-label">Email</span>
+        <input type="email" id="miEmail" placeholder="tucorreo@ejemplo.com"></label>
+      <label class="field"><span class="field-label">Alias (para cobro de propinas)</span>
+        <input type="text" id="miAlias" placeholder="alias.mp o CBU"></label>
+
+      <div class="md-subhead">Talles (uniforme)</div>
+      <div class="md-talles">
+        <label class="field"><span class="field-label">Remera</span>
+          <select id="miTalleRemera"></select></label>
+        <label class="field"><span class="field-label">Pantalón</span>
+          <select id="miTallePantalon"></select></label>
+        <label class="field"><span class="field-label">Calzado</span>
+          <select id="miTalleCalzado"></select></label>
+      </div>
+
+      <div class="login-error" id="misDatosError"></div>
+      <div class="md-ok" id="misDatosOk"></div>
+
+      <div style="margin-top:16px;">
+        <button class="btn-primary" id="btnGuardarMisDatos" onclick="guardarMisDatos()" style="width:100%;">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="vMisRecetas" class="view">
+  <div class="module-wrap">
+
+    <div class="module-header">
+      <button class="btn-back" onclick="showDashboard()" aria-label="Volver"><i class="ti ti-arrow-left"></i></button>
+      <div class="module-title-block">
+        <div class="module-title">Mis recetas</div>
+        <div class="module-subtitle" id="recetasCount">Cargando...</div>
+      </div>
+    </div>
+
+    <div class="receta-subnav">
+      <button class="receta-tab active" id="tabElaboracion" onclick="cambiarSeccionReceta('elaboracion')">Sub-elaboraciones</button>
+      <button class="receta-tab" id="tabPlato" onclick="cambiarSeccionReceta('plato')">Platos</button>
+      <button class="receta-tab" id="tabMenu" onclick="cambiarSeccionReceta('menu')">Menús</button>
+    </div>
+
+    <div class="admin-toolbar">
+      <input type="search" id="recetaSearch" placeholder="Buscar sub-elaboración..." class="search-input">
+      <button class="btn-primary btn-icon-only" id="recetaNuevoBtn" onclick="abrirNuevaSubelab()" title="Nueva sub-elaboración"><i class="ti ti-plus"></i></button>
+    </div>
+
+    <div class="personal-filtros">
+      <select id="recetaFiltroLocal" class="mini-select"><option value="">Todos los locales</option></select>
+    </div>
+
+    <div id="recetasLista"><div class="loading">Cargando sub-elaboraciones...</div></div>
+
+  </div>
+</div>
+
+<!-- ============================================
+     MODAL: NUEVA / EDITAR SUB-ELABORACIÓN
+============================================ -->
+<div class="modal-overlay" id="modalSubelab">
+  <div class="modal-card cierre-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="subelabTitulo">Nueva sub-elaboración</h2>
+      <button class="modal-close" onclick="closeSubelab()" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body cierre-body">
+
+      <label class="field"><span class="field-label">Nombre</span>
+        <input type="text" id="subelabNombre" placeholder="Ej: Aceite de achiote"></label>
+
+      <label class="field"><span class="field-label">Local</span>
+        <select id="subelabLocal"></select></label>
+
+      <div id="rendimientoCampos">
+        <div class="cierre-row2">
+          <label class="field"><span class="field-label">Rendimiento</span>
+            <input type="number" min="0" step="any" id="subelabRendimiento" placeholder="0"></label>
+          <label class="field"><span class="field-label">Unidad</span>
+            <select id="subelabUnidad"></select></label>
+        </div>
+      </div>
+
+      <div id="categoriaCampo" style="display:none;">
+        <label class="field"><span class="field-label">Categoría</span>
+          <select id="platoCategoria">
+            <option value="">(sin categoría)</option>
+            <option value="snack">Snack</option>
+            <option value="entrada">Entrada</option>
+            <option value="principal">Principal</option>
+            <option value="postre">Postre</option>
+            <option value="pan">Pan</option>
+          </select></label>
+      </div>
+
+      <div id="precioCampo" style="display:none;">
+        <label class="field"><span class="field-label">Precio de venta</span>
+          <input type="text" inputmode="numeric" id="platoPrecio" placeholder="$ 0"></label>
+      </div>
+
+      <div id="componentesSection" class="cierre-section" style="margin-top:6px;">
+        <div class="cierre-section-title"><i class="ti ti-list-details"></i> Componentes</div>
+        <div class="comp-add">
+          <select id="compTipo" class="mini-select" onchange="poblarItemsComponente()">
+            <option value="ingrediente">Insumo</option>
+            <option value="receta">Sub-elaboración</option>
+          </select>
+          <div id="compItemWrap" class="ped-ins-wrap" style="flex:1;min-width:0;">
+          <input type="text" id="compItemSearch" class="ped-ins-search" placeholder="Elegí un insumo..." autocomplete="off"
+            onclick="recFiltrarItems(this)" oninput="recFiltrarItems(this)">
+          <input type="hidden" id="compItem">
+          <div id="compItemOpts" class="ped-ins-opts"></div>
+        </div>
+          <div class="comp-add-row2">
+            <input type="number" min="0" step="any" id="compCantidad" class="mini-select" placeholder="Cantidad">
+            <select id="compUnidad" class="mini-select">
+              <option>kg</option><option>g</option><option>l</option><option>ml</option><option>unidad</option><option>porción</option>
+            </select>
+            <button type="button" class="btn-primary comp-add-btn" onclick="agregarComponente()"><i class="ti ti-plus"></i></button>
+          </div>
+        </div>
+        <div id="componentesLista" style="margin-top:10px;"></div>
+      </div>
+
+      <div id="menuPasosSection" class="cierre-section" style="margin-top:6px; display:none;">
+        <div class="cierre-section-title"><i class="ti ti-list-numbers"></i> Pasos del menú</div>
+        <div class="comp-add">
+          <div style="display:flex; gap:8px;">
+            <select id="pasoPlato" class="mini-select" style="flex:1; min-width:0;"></select>
+            <button type="button" class="btn-primary comp-add-btn" onclick="agregarPaso()"><i<i class="ti ti-plus"></i></button>
+          </div>
+        </div>
+        <div id="pasosLista" style="margin-top:10px;"></div>
+      </div>
+
+    </div>
+
+      <div class="field" style="margin-top:8px;">
+        <span class="field-label">Procedimiento <span style="font-weight:400;opacity:.6">(opcional)</span></span>
+        <textarea id="subelabProcedimiento" rows="3" placeholder="Pasos de elaboración..." style="width:100%;resize:vertical;"></textarea>
+      </div>
+      <div id="subelabError" style="color:var(--c-error);font-size:13px;margin-top:6px;"></div>
+
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeSubelab()">Cancelar</button>
+      <button id="btnGuardarSubelab" class="btn-primary" onclick="guardarSubelab()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MODAL: PAPER READER (Academia)
+============================================ -->
+<div id="modalPaperReader" class="modal-overlay">
+  <div class="modal-card paper-reader-card">
+    <div class="paper-reader-header">
+      <div>
+        <div class="paper-reader-meta" id="paperReaderMeta"></div>
+        <div class="paper-reader-titulo" id="paperReaderTitulo"></div>
+      </div>
+      <button class="modal-close" onclick="closePaperReader()" aria-label="Cerrar">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+    <div class="paper-reader-scroll" id="paperReaderBody"></div>
+    <div class="paper-reader-footer">
+      <button class="btn-primary" id="paperReaderBtnQuiz" onclick="iniciarQuiz()">
+        <i class="ti ti-pencil-check"></i> Hacer el quiz
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MODAL: QUIZ (Academia)
+============================================ -->
+<div id="modalQuizAcademia" class="modal-overlay">
+  <div class="modal-card quiz-card">
+    <div class="modal-header">
+      <div class="modal-title" id="quizModalTitulo"></div>
+      <button class="modal-close" onclick="cerrarQuiz()" aria-label="Cerrar">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+    <div class="quiz-scroll">
+      <div id="quizFormSection">
+        <div id="quizPreguntas"></div>
+      </div>
+      <div id="quizResultadoSection" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary btn-block" id="btnEnviarQuiz" onclick="enviarQuiz()">
+        Enviar respuestas
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MODAL: FORM PAPER (Academia Admin)
+============================================ -->
+<div id="modalFormPaper" class="modal-overlay">
+  <div class="modal-card modal-bib">
+    <div class="modal-header">
+      <div class="modal-title" id="formPaperModalTitulo">Nuevo paper</div>
+      <button class="modal-close" onclick="closeFormPaper()" aria-label="Cerrar">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+
+    <div class="modal-body modal-scrollable">
+      <div class="form-group">
+        <label class="form-label">Título</label>
+        <input type="text" id="papTitulo" class="form-input" placeholder="Ej: La gastronomía no es solo dar de comer" maxlength="120">
+      </div>
+
+      <div style="display:flex;gap:12px">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Nivel</label>
+          <select id="papNivel" class="form-input">
+            <option value="1">Nivel 1 · Iniciante</option>
+            <option value="2">Nivel 2 · Avanzado</option>
+            <option value="3">Nivel 3 · Formadores</option>
+          </select>
+        </div>
+        <div class="form-group" style="width:90px">
+          <label class="form-label">Unidad</label>
+          <input type="number" id="papUnidad" class="form-input" min="1" value="1">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Subtítulo <span style="opacity:.55;font-weight:400">(opcional)</span></label>
+        <input type="text" id="papSubtitulo" class="form-input" placeholder="Una frase que introduzca el paper">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Link al PDF</label>
+        <div class="form-hint" style="margin-bottom:6px">
+          Ej: link de Google Drive, Dropbox o cualquier PDF online
+        </div>
+        <input type="url" id="papUrl" class="form-input" placeholder="https://drive.google.com/...">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+        <input type="checkbox" id="papActivo" checked>
+        <label for="papActivo" class="form-label" style="margin:0;cursor:pointer">Paper activo (visible para empleados)</label>
+      </div>
+
+      <div class="preg-ed-section">
+        <div class="preg-ed-titulo">
+          <i class="ti ti-list-check"></i> Preguntas del quiz
+        </div>
+        <div id="pregEditor"></div>
+        <button class="btn-ghost" onclick="addPreg()" style="margin-top:10px;width:100%">
+          <i class="ti ti-plus"></i> Agregar pregunta
+        </button>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeFormPaper()">Cancelar</button>
+      <button class="btn-primary" id="btnGuardarPaper" onclick="guardarPaper()">
+        <i class="ti ti-device-floppy"></i> Guardar paper
+      </button>
     </div>
   </div>
 </div>
