@@ -7733,14 +7733,20 @@ function renderPanelVentas(cierres, objetivo, evolData, objetivoHeredado, agrega
   const netoVentas = brutoVentas / IVA_COEF;
   const promBruto = pax > 0 ? brutoVentas / pax : null;
   const promNeto = pax > 0 ? netoVentas / pax : null;
+  const nTurnos = cierres.length;
+  const promPaxTurno = nTurnos > 0 ? pax / nTurnos : null;
+  const promVtaBrutoTurno = nTurnos > 0 ? brutoVentas / nTurnos : null;
+  const promVtaNetoTurno = nTurnos > 0 ? netoVentas / nTurnos : null;
 
   let html = '';
   if (agregado) html += '<div class="cierre-hint" style="margin-bottom:12px">Vista consolidada: suma de todos los locales.</div>';
-  html += '<div class="est-cards">' +
-    '<div class="est-card"><div class="est-card-label">Ventas (bruto)</div><div class="est-card-valor">' + _pvMoney(brutoVentas) + '</div><div class="pv-sub">Neto ' + _pvMoney(netoVentas) + '</div></div>' +
-    '<div class="est-card"><div class="est-card-label">Comensales</div><div class="est-card-valor">' + formatNumber(pax) + '</div></div>' +
-    '<div class="est-card"><div class="est-card-label">Prom. x comensal</div><div class="est-card-valor">' + (promBruto != null ? _pvMoney(promBruto) : '—') + '</div><div class="pv-sub">' + (promNeto != null ? 'Neto ' + _pvMoney(promNeto) : '') + '</div></div>' +
-    '<div class="est-card"><div class="est-card-label">Turnos cargados</div><div class="est-card-valor">' + cierres.length + '</div></div>' +
+  html += '<div class="pv-cards">' +
+    '<div class="pv-card"><div class="pv-card-label">Ventas (bruto)</div><div class="pv-card-valor">' + _pvMoney(brutoVentas) + '</div><div class="pv-sub">Neto ' + _pvMoney(netoVentas) + '</div></div>' +
+    '<div class="pv-card"><div class="pv-card-label">Comensales</div><div class="pv-card-valor">' + formatNumber(pax) + '</div></div>' +
+    '<div class="pv-card"><div class="pv-card-label">Turnos cargados</div><div class="pv-card-valor">' + nTurnos + '</div></div>' +
+    '<div class="pv-card"><div class="pv-card-label">Prom. x comensal</div><div class="pv-card-valor">' + (promBruto != null ? _pvMoney(promBruto) : '—') + '</div><div class="pv-sub">' + (promNeto != null ? 'Neto ' + _pvMoney(promNeto) : '') + '</div></div>' +
+    '<div class="pv-card"><div class="pv-card-label">Prom. pax x turno</div><div class="pv-card-valor">' + (promPaxTurno != null ? formatNumber(Math.round(promPaxTurno)) : '—') + '</div></div>' +
+    '<div class="pv-card"><div class="pv-card-label">Prom. vtas x turno</div><div class="pv-card-valor">' + (promVtaBrutoTurno != null ? _pvMoney(promVtaBrutoTurno) : '—') + '</div><div class="pv-sub">' + (promVtaNetoTurno != null ? 'Neto ' + _pvMoney(promVtaNetoTurno) : '') + '</div></div>' +
   '</div>';
 
   html += '<div class="pv-obj">';
