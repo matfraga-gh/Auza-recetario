@@ -96,7 +96,17 @@ async function api(path, options = {}) {
   };
 
   const url = SUPABASE_URL + '/rest/v1/' + path;
-  const res = await fetch(url, opts);
+  const ctrl = new AbortController();
+  const timer = setTimeout(function() { ctrl.abort(); }, 20000);
+  let res;
+  try {
+    res = await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('La conexión tardó demasiado. Revisá tu internet y probá de nuevo.');
+    throw new Error('No se pudo conectar con el servidor. Revisá tu conexión y probá de nuevo.');
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const txt = await res.text();
