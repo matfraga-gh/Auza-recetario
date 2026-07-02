@@ -43,6 +43,9 @@ async function cargarLocalesDesdeBase() {
     LOCALES_DB = data || [];
     LOCAL_LABELS = {};
     LOCALES_DB.forEach(l => { LOCAL_LABELS[l.slug] = l.nombre; });
+    // El "transversal" es solo el filtro "ver todos": se muestra como TODOS
+    const _tv = LOCALES_DB.find(x => /transversal/i.test(x.nombre || '') || /transversal/i.test(x.slug || ''));
+    if (_tv) LOCAL_LABELS[_tv.slug] = 'TODOS';
   } catch (e) {
     console.error('Error al cargar locales:', e);
     // Fallback de emergencia para que la app no se rompa si falla la query
@@ -56,6 +59,9 @@ async function cargarLocalesDesdeBase() {
     ];
     LOCAL_LABELS = {};
     LOCALES_DB.forEach(l => { LOCAL_LABELS[l.slug] = l.nombre; });
+    // El "transversal" es solo el filtro "ver todos": se muestra como TODOS
+    const _tv = LOCALES_DB.find(x => /transversal/i.test(x.nombre || '') || /transversal/i.test(x.slug || ''));
+    if (_tv) LOCAL_LABELS[_tv.slug] = 'TODOS';
   }
 }
 
@@ -105,6 +111,9 @@ async function api(path, options = {}) {
 // HELPERS - Hash y sesión
 // ============================================
 async function sha256(str) {
+  if (!crypto || !crypto.subtle) {
+    throw new Error('Tu navegador no soporta cifrado seguro. Abrí la app desde https:// en Chrome o Safari actualizado.');
+  }
   const buf = new TextEncoder().encode(str);
   const hash = await crypto.subtle.digest('SHA-256', buf);
   return Array.from(new Uint8Array(hash))
@@ -231,6 +240,13 @@ function esc(s) {
 function formatNumber(n) {
   const num = Math.round(parseFloat(n) || 0);
   return num.toLocaleString('es-AR');
+}
+function formatMonto(n) {
+  const num = parseFloat(n) || 0;
+  if (num % 1 !== 0) {
+    return num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return Math.round(num).toLocaleString('es-AR');
 }
 
 // ============================================
@@ -432,13 +448,22 @@ const MODULES = [
     action: () => openMiBiblioteca()
   },
   {
+    id: 'misdatos',
+    icon: 'ti-id-badge-2',
+    color: '#5B8C7B',
+    title: 'Mis Datos',
+    desc: 'Tus datos personales y de cobro',
+    visible: () => !!(currentUser && currentUser.empleado_id),
+    action: () => openMisDatos()
+  },
+  {
     id: 'recetas',
     icon: 'ti-chef-hat',
     color: '#D85A30',
     title: 'Mis recetas',
     desc: 'Recetas y menús del local',
     visible: () => isMaster() || isAdmin() || currentUser.editor_recetas,
-    action: () => toast('Módulo "Mis recetas" - próximamente', 'warning')
+    action: () => openMisRecetas()
   },
   {
     id: 'pedidos',
@@ -447,7 +472,61 @@ const MODULES = [
     title: 'Mis pedidos',
     desc: 'Requerimientos y stock',
     visible: () => isMaster() || isAdmin() || currentUser.editor_pedidos,
-    action: () => toast('Módulo "Mis pedidos" - próximamente', 'warning')
+    action: () => openMisPedidos()
+  },
+  {
+    id: 'stock',
+    icon: 'ti-clipboard-check',
+    color: '#1D9E75',
+    title: 'Mi Stock',
+    desc: 'Control de stock por local',
+    visible: () => puedeGestionarStock(),
+    action: () => openMiStock()
+  },
+  {
+    id: 'cierres',
+    icon: 'ti-cash-register',
+    color: '#C4622D',
+    title: 'Mis Cierres',
+    desc: 'Cierre de caja por local y turno',
+    visible: () => puedeGestionarCierres(),
+    action: () => openMisCierres()
+  },
+  {
+    id: 'panelventas',
+    icon: 'ti-chart-line',
+    color: '#2D7FC4',
+    title: 'Panel de ventas',
+    desc: 'Evolución, promedio y objetivo del mes',
+    visible: () => isMaster() || isAdmin() || isAuditor(),
+    action: () => openPanelVentas()
+  },
+  {
+    id: 'insumos',
+    icon: 'ti-package',
+    color: '#EF9F27',
+    title: 'Insumos',
+    desc: 'Catálogo, validación y subfamilias',
+    visible: () => !!(currentUser && currentUser.editor_insumos) && !isMaster() && !isAdmin(),
+    action: () => openAdminInsumos()
+  },
+  {
+    id: 'rosters',
+    icon: 'ti-calendar-event',
+    color: '#7F77DD',
+    title: 'Gestión de Rosters',
+    desc: 'Armá la semana del equipo',
+    visible: () => puedeGestionarRosters(),
+    action: () => openGestionRosters()
+  },
+  {
+    id: 'incidencias',
+    icon: 'ti-alert-triangle',
+    color: '#C4622D',
+    title: 'Gestión de Incidencias',
+    desc: 'Aceptar o rechazar reportes del equipo',
+    visible: () => puedeGestionarRosters(),
+    action: () => openGestionIncidencias()
   },
   {
     id: 'admin',
@@ -467,6 +546,11 @@ function isMaster() {
 function isAdmin() {
   return currentUser && currentUser.perfil === 'admin';
 }
+
+function isAuditor() {
+  return currentUser && currentUser.perfil === 'auditor';
+}
+window.isAuditor = isAuditor;
 
 // ============================================
 // LÓGICA DE LOGIN
@@ -625,17 +709,23 @@ function showDashboard() {
     return;
   }
 
+  // Inicializar inputs monetarios (una sola vez)
+  ['ccVentas','cierreTarjeta','cierreTransf','platoPrecio','insCosto'].forEach(initMoneyInput);
+
   const nombre = currentUser.nombre || currentUser.usuario;
   const perfil = currentUser.perfil || 'usuario';
   const roleLabel = {
     master: 'Master',
     admin: 'Admin',
     editor: 'Editor',
+    auditor: 'Auditor',
     usuario: 'Usuario'
   }[perfil] || 'Usuario';
 
   // Saludo según hora del día + nombre de pila
-  const primerNombre = nombre.trim().split(/\s+/)[0];
+  let primerNombre = (currentEmpleado && currentEmpleado.nombre_p)
+    ? currentEmpleado.nombre_p.trim().split(/\s+/)[0]
+    : nombre.trim().split(/\s+/)[0];
   const hora = new Date().getHours();
   let saludo, emoji;
   if (hora >= 5 && hora < 12) {
@@ -650,6 +740,17 @@ function showDashboard() {
   }
   document.getElementById('greetingText').textContent = `${saludo}, ${primerNombre}`;
   document.getElementById('greetingEmoji').textContent = emoji;
+  // Si no tenemos el nombre de pila cargado, lo buscamos y corregimos el saludo
+  if (currentUser.empleado_id && (!currentEmpleado || !currentEmpleado.nombre_p)) {
+    api('empleados?id=eq.' + currentUser.empleado_id + '&select=*').then(function(emps) {
+      if (emps && emps.length) {
+        currentEmpleado = emps[0];
+        const pn = (currentEmpleado.nombre_p || '').trim().split(/\s+/)[0];
+        const el = document.getElementById('greetingText');
+        if (pn && el) el.textContent = saludo + ', ' + pn;
+      }
+    }).catch(function() {});
+  }
 
   // User pill
   document.getElementById('userPillName').textContent = nombre;
@@ -689,6 +790,7 @@ async function openMiPerfil() {
     master: 'Master',
     admin: 'Admin',
     editor: 'Editor',
+    auditor: 'Auditor',
     usuario: 'Usuario'
   }[perfil] || 'Usuario';
 
@@ -744,7 +846,8 @@ window.openMiPerfil = openMiPerfil;
 
 function renderDashboardCards() {
   const grid = document.getElementById('dashGrid');
-  const visibleModules = MODULES.filter(m => m.visible());
+  let visibleModules = MODULES.filter(m => m.visible());
+  if (isAuditor()) visibleModules = MODULES.filter(m => m.id === 'panelventas');
 
   grid.innerHTML = visibleModules.map((m, idx) => {
     const isLastOdd = (idx === visibleModules.length - 1) && (visibleModules.length % 2 === 1);
@@ -1083,10 +1186,11 @@ window.verIncidencia = async function(id) {
         <div class="det-label">Descripción</div>
         <div class="det-value">${esc(inc.descripcion || '—')}</div>
       </div>
+      ${inc.respuesta ? `<div class="det-line"><div class="det-label">Respuesta</div><div class="det-value">${esc(inc.respuesta)}</div></div>` : ''}
     `;
     document.getElementById('modalIncDetalle').classList.add('show');
   } catch (e) {
-    toast('Error al cargar la incidencia', 'error');
+    toast('Error al cargar la incidencia: ' + ((e && e.message) || e), 'error');
   }
 };
 
@@ -1138,6 +1242,10 @@ async function openMiPropina() {
     return;
   }
 
+  // No existen cierres "transversales": ese local es solo un filtro de vista
+  const _tvSlug = getSlugTransversal();
+  if (_tvSlug) asigs = asigs.filter(a => !a.cierre || a.cierre.local !== _tvSlug);
+
   const pendientes = asigs.filter(a => a.cierre && !a.cierre.pagado && a.monto > 0);
 
   const hoy = new Date();
@@ -1149,8 +1257,8 @@ async function openMiPropina() {
 
   let html = '';
 
-  // ===== 1. BOTÓN DE GESTIÓN (solo Master o Admin por ahora) =====
-  if (isMaster() || isAdmin()) {
+  // ===== 1. BOTÓN DE GESTIÓN (Master, Admin o editor de propinas) =====
+  if (puedeGestionarPropinas()) {
     html += `
       <button class="btn-gestion" onclick="abrirGestionPropinas()">
         <i class="ti ti-settings"></i> GESTIÓN DE PROPINAS
@@ -1163,7 +1271,7 @@ async function openMiPropina() {
     html += `
       <div class="propina-banner">
         <div class="propina-banner-label">Total pendiente de cobro</div>
-        <div class="propina-banner-monto">$${formatNumber(totalPendiente)}</div>
+        <div class="propina-banner-monto">$${formatMonto(totalPendiente)}</div>
         <div class="propina-banner-sub">${pendientes.length} ${pendientes.length === 1 ? 'cierre pendiente' : 'cierres pendientes'}</div>
       </div>`;
   } else {
@@ -1200,7 +1308,7 @@ async function openMiPropina() {
         <div class="pend-local">
           <div class="pend-local-header">
             <div class="pend-local-name"><i class="ti ti-map-pin"></i> ${esc(LOCAL_LABELS[loc] || loc)}</div>
-            <div class="pend-local-total">$${formatNumber(data.total)}</div>
+            <div class="pend-local-total">$${formatMonto(data.total)}</div>
           </div>
           ${data.dias.map(d => {
             const pts = d.puntos === 1 ? '1 punto' : d.puntos === 0.5 ? '½ punto' : d.puntos + ' pts';
@@ -1210,7 +1318,7 @@ async function openMiPropina() {
                   <span class="pend-dia-fecha">${fmtFechaCorta(d.fecha)}</span>
                   <span class="pend-dia-meta">${turnoIcon[d.turno] || ''} ${turnoLbl[d.turno] || d.turno} · ${pts}</span>
                 </div>
-                <div class="pend-dia-monto">$${formatNumber(d.monto)}</div>
+                <div class="pend-dia-monto">$${formatMonto(d.monto)}</div>
               </div>`;
           }).join('')}
         </div>`;
@@ -1244,7 +1352,7 @@ async function openMiPropina() {
           ${buckets.map((b, i) => `
             <div class="cobrado-mes${i === 0 ? ' actual' : ''}">
               <div class="cobrado-mes-label">${b.lbl}${i === 0 ? ' · Actual' : ''}</div>
-              <div class="cobrado-mes-monto${b.total > 0 ? '' : ' cero'}">$${formatNumber(b.total)}</div>
+              <div class="cobrado-mes-monto${b.total > 0 ? '' : ' cero'}">$${formatMonto(b.total)}</div>
               ${b.cantidad ? `<div class="cobrado-mes-cant">${b.cantidad} ${b.cantidad === 1 ? 'cierre' : 'cierres'}</div>` : ''}
             </div>
           `).join('')}
@@ -1309,16 +1417,18 @@ async function abrirGestionPropinas() {
     return;
   }
 
-  // Pre-seleccionar el primer local del usuario si no hay selección
+  // Pre-seleccionar el primer local real (no transversal) si no hay selección
   const localesUser = localesPropinasUsuario();
+  const slugTransversal = getSlugTransversal();
   if (!PROP_LOCAL_SEL || !localesUser.includes(PROP_LOCAL_SEL)) {
-    PROP_LOCAL_SEL = localesUser[0] || null;
+    PROP_LOCAL_SEL = localesUser.find(l => l !== slugTransversal) || localesUser[0] || null;
   }
 
   renderPropGestHeader();
   renderPropGestLocales();
   renderPropGestKpis();
   renderPropGestTabla();
+  actualizarBtnNuevoCierre();
 }
 
 function renderPropGestHeader() {
@@ -1338,6 +1448,9 @@ function renderPropGestHeader() {
     btn.onclick = openConfigPropinas;
     headerBlock.appendChild(btn);
   }
+
+  const _pexp = document.getElementById('propExportWrap');
+  if (_pexp) _pexp.style.display = puedeAdminPropinas() ? '' : 'none';
 
   subtitle.textContent = puedeAdminPropinas()
     ? 'Cierres registrados · podés editarlos y marcar como pagados'
@@ -1372,11 +1485,26 @@ function selectPropLocal(slug) {
   renderPropGestLocales();
   renderPropGestKpis();
   renderPropGestTabla();
+  actualizarBtnNuevoCierre();
 }
 
 function cierresLocalActual() {
   if (!PROP_LOCAL_SEL) return [];
+  const slugTodos = getSlugTransversal();
+  if (slugTodos && PROP_LOCAL_SEL === slugTodos) {
+    // "Todos los locales": agrego los cierres de todos los locales reales que el usuario puede ver
+    const visibles = localesPropinasUsuario();
+    return PROP_CIERRES.filter(c => c.local !== slugTodos && visibles.includes(c.local));
+  }
   return PROP_CIERRES.filter(c => c.local === PROP_LOCAL_SEL);
+}
+
+// El botón "Nuevo cierre" no aplica en modo "Todos"
+function actualizarBtnNuevoCierre() {
+  // El botón siempre es visible; abrirNuevoCierre() valida la selección de local
+  const btn = document.getElementById('propGestNuevoBtn');
+  if (!btn) return;
+  btn.style.display = '';
 }
 
 function renderPropGestKpis() {
@@ -1387,9 +1515,9 @@ function renderPropGestKpis() {
   const pendientes = cierres.filter(c => !c.pagado).length;
   const pagados = total - pendientes;
 
-  const bruto = cierres.reduce((s, c) => s + parseFloat(c.total_bruto || 0), 0);
-  const netoPendiente = cierres.filter(c => !c.pagado).reduce((s, c) => s + parseFloat(c.total_neto || 0), 0);
-  const netoPagado = cierres.filter(c => c.pagado).reduce((s, c) => s + parseFloat(c.total_neto || 0), 0);
+  const totalAcum = cierres.reduce((s, c) => s + parseFloat(c.total_neto || 0), 0);
+  const aLiquidar = cierres.filter(c => !c.pagado).reduce((s, c) => s + parseFloat(c.total_neto || 0), 0);
+  const yaPagado = cierres.filter(c => c.pagado).reduce((s, c) => s + parseFloat(c.total_neto || 0), 0);
 
   cont.innerHTML = `
     <div class="kpi-card">
@@ -1398,13 +1526,13 @@ function renderPropGestKpis() {
       <div class="kpi-sub">${pendientes} pendiente${pendientes !== 1 ? 's' : ''} · ${pagados} pagado${pagados !== 1 ? 's' : ''}</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Total bruto acumulado</div>
-      <div class="kpi-value">$${formatNumber(bruto)}</div>
+      <div class="kpi-label">Total acumulado</div>
+      <div class="kpi-value">$${formatNumber(totalAcum)}</div>
     </div>
     <div class="kpi-card highlight">
-      <div class="kpi-label">Neto a liquidar</div>
-      <div class="kpi-value">$${formatNumber(netoPendiente)}</div>
-      <div class="kpi-sub">+$${formatNumber(netoPagado)} ya pagados</div>
+      <div class="kpi-label">A liquidar</div>
+      <div class="kpi-value">$${formatNumber(aLiquidar)}</div>
+      <div class="kpi-sub">+$${formatNumber(yaPagado)} ya pagados</div>
     </div>
   `;
 }
@@ -1438,9 +1566,9 @@ function renderPropGestTabla() {
       <div class="prop-tabla-header">
         <span>Fecha</span>
         <span>Turno</span>
-        <span>Bruto</span>
-        <span>Neto</span>
-        <span>Puntos</span>
+        <span>Local</span>
+        <span>Monto</span>
+        <span>Pts</span>
         <span>Estado</span>
       </div>`;
 
@@ -1451,18 +1579,22 @@ function renderPropGestTabla() {
     const estadoCls = c.pagado ? 'pagado' : 'cerrado';
     const estadoTxt = c.pagado ? '✓ Pagado' : 'Cerrado';
 
-    // Solo Admin/Master puede togglear pagado
-    const estadoClickable = puedeAdminPropinas() ? `onclick="togglePagado(${c.id})"` : '';
+    // Solo Admin/Master puede togglear pagado (no propaga al click de la fila)
+    const estadoClickable = puedeAdminPropinas() ? `onclick="event.stopPropagation(); togglePagado(${c.id})"` : '';
     const estadoTitle = puedeAdminPropinas()
       ? (c.pagado ? 'title="Click para volver a Cerrado"' : 'title="Click para marcar como Pagado"')
       : '';
 
+    // Master/Admin pueden editar un cierre mientras no esté pagado
+    const editable = puedeAdminPropinas() && !c.pagado;
+    const rowAttrs = editable ? `onclick="abrirEditarCierre(${c.id})" style="cursor:pointer" title="Tocá la fila para editar este cierre"` : '';
+
     html += `
-      <div class="prop-tabla-row">
+      <div class="prop-tabla-row" ${rowAttrs}>
         <span class="prop-fecha">${fecha}</span>
         <span class="prop-turno">${turnoLabel}</span>
-        <span class="prop-monto">$${formatNumber(c.total_bruto || 0)}</span>
-        <span class="prop-monto">$${formatNumber(c.total_neto || 0)}</span>
+        <span class="prop-local">${esc(localLabel(c.local))}</span>
+        <span class="prop-monto">$${formatNumber(Math.round((c.total_bruto || 0) * (1 - (parseFloat(c.porcentaje_admin) || 0) / 100)))}</span>
         <span>${c.total_puntos || 0}</span>
         <span class="prop-estado ${estadoCls}" ${estadoClickable} ${estadoTitle}>${estadoTxt}</span>
       </div>`;
@@ -1527,11 +1659,1380 @@ async function togglePagado(cierreId) {
     renderPropGestKpis();
     renderPropGestTabla();
   } catch (e) {
-    toast('Error al actualizar', 'error');
+    toast('Error al actualizar: ' + ((e && e.message) || e), 'error');
   }
 }
 
 // Placeholder para nuevo cierre (Fase 2)
+// ============================================
+// FASE 2 — NUEVO CIERRE DE PROPINAS
+// ============================================
+const BILLETES_DENOM = [100, 200, 500, 1000, 2000, 10000, 20000];
+let CIERRE_COLABS = [];
+let CIERRE_EDITANDO = null;       // id del cierre en edición (null = nuevo)
+let CIERRE_EDIT_PUNTOS = {};      // empleado_id -> puntos (pre-carga al editar)
+let CIERRE_LOCAL_ACTUAL = null;   // local del cierre que se está cargando/editando
+
+function billeteVal(d) {
+  const el = document.getElementById('bil_' + d);
+  return el ? (parseInt(el.value, 10) || 0) : 0;
+}
+function parseMiles(str) {
+  if (str == null || str === '') return 0;
+  return parseFloat(String(str).replace(/[$\s]/g, '').replace(/\./g, '').replace(/,/g, '.')) || 0;
+}
+function setMoneyVal(id, n) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const num = (n != null && n !== '') ? Math.round(parseFloat(n) || 0) : 0;
+  el.value = num ? '$ ' + num.toLocaleString('es-AR') : '';
+}
+function initMoneyInput(id) {
+  const el = document.getElementById(id);
+  if (!el || el._moneyInit) return;
+  el._moneyInit = true;
+  el.addEventListener('focus', function() {
+    const raw = parseMiles(this.value);
+    this.value = raw ? String(Math.round(raw)) : '';
+    setTimeout(() => this.select(), 0);
+  });
+  el.addEventListener('blur', function() {
+    const raw = parseMiles(this.value);
+    this.value = raw ? '$ ' + Math.round(raw).toLocaleString('es-AR') : '';
+  });
+  el.addEventListener('input', function() {
+    this.value = this.value.replace(/[^\d]/g, '');
+  });
+}
+function valNumCierre(id) {
+  const el = document.getElementById(id);
+  return el ? (parseMiles(el.value) || 0) : 0;
+}
+
+function abrirNuevoCierre() {
+  if (!puedeGestionarPropinas()) { toast('No tenés permiso para cargar cierres', 'error'); return; }
+  if (!PROP_LOCAL_SEL || PROP_LOCAL_SEL === getSlugTransversal()) { toast('Elegí un local para cargar el cierre', 'error'); return; }
+  CIERRE_EDITANDO = null;
+  CIERRE_EDIT_PUNTOS = {};
+  CIERRE_LOCAL_ACTUAL = PROP_LOCAL_SEL;
+  const tit = document.getElementById('cierreModalTitulo'); if (tit) tit.textContent = 'Nuevo cierre';
+
+  document.getElementById('cierreLocal').value = localLabel(PROP_LOCAL_SEL);
+  document.getElementById('cierreFecha').value = hoyStr();
+  document.getElementById('cierreTurno').value = 'noche';
+  ['cierreUsd','cierreEur','cierreBrl','cierreTarjeta','cierreTransf','cierreComentario'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('cierreError').textContent = '';
+
+  const tc = PROP_CONFIG || {};
+  document.getElementById('cierreTcHint').textContent =
+    'Cotización actual: USD $' + formatNumber(tc.cambio_usd || 0) +
+    ' · EUR $' + formatNumber(tc.cambio_eur || 0) +
+    ' · BRL $' + formatNumber(tc.cambio_brl || 0);
+
+  document.getElementById('cierreBilletes').innerHTML = BILLETES_DENOM.map(d =>
+    '<label class="billete-row"><span>$' + formatNumber(d) + '</span>' +
+    '<input type="number" min="0" step="1" id="bil_' + d + '" placeholder="0" oninput="recalcCierre()"></label>'
+  ).join('');
+
+  document.getElementById('cierreColabs').innerHTML = '<div class="loading">Cargando colaboradores...</div>';
+  document.getElementById('modalNuevoCierre').classList.add('show');
+  cargarColabsCierre();
+  recalcCierre();
+}
+window.abrirNuevoCierre = abrirNuevoCierre;
+
+// "Transversal (todos)" no es un local real: es el botón de "ver todos juntos"
+function getSlugTransversal() {
+  const l = LOCALES_DB.find(x => /transversal/i.test(x.nombre || '') || /transversal/i.test(x.slug || ''));
+  return l ? l.slug : null;
+}
+
+async function abrirEditarCierre(cierreId) {
+  if (!puedeAdminPropinas()) { toast('Solo Master/Admin puede editar cierres', 'error'); return; }
+  const c = (PROP_CIERRES || []).find(x => x.id === cierreId);
+  if (!c) { toast('No se encontró el cierre', 'error'); return; }
+  if (c.pagado) { toast('No se puede editar un cierre ya pagado', 'error'); return; }
+  // Asegurar que PROP_CONFIG esté cargado (puede no estarlo si se abre desde liquidar)
+  if (!PROP_CONFIG) {
+    try {
+      const data = await api('propinas_config?id=eq.1');
+      PROP_CONFIG = (data && data[0]) ? data[0] : {};
+    } catch(e) { PROP_CONFIG = {}; }
+  }
+
+  CIERRE_EDITANDO = cierreId;
+  CIERRE_EDIT_PUNTOS = {};
+  CIERRE_LOCAL_ACTUAL = c.local;
+  const tit = document.getElementById('cierreModalTitulo'); if (tit) tit.textContent = 'Editar cierre';
+
+  document.getElementById('cierreLocal').value = localLabel(c.local);
+  document.getElementById('cierreFecha').value = c.fecha || hoyStr();
+  document.getElementById('cierreTurno').value = c.turno || 'noche';
+  document.getElementById('cierreUsd').value = c.monto_usd || '';
+  document.getElementById('cierreEur').value = c.monto_eur || '';
+  document.getElementById('cierreBrl').value = c.monto_brl || '';
+  setMoneyVal('cierreTarjeta', c.monto_tarjeta);
+  setMoneyVal('cierreTransf', c.monto_transferencia);
+  document.getElementById('cierreComentario').value = c.comentario || '';
+  document.getElementById('cierreError').textContent = '';
+
+  const tc = PROP_CONFIG || {};
+  document.getElementById('cierreTcHint').textContent =
+    'Cotización actual: USD $' + formatNumber(tc.cambio_usd || 0) +
+    ' · EUR $' + formatNumber(tc.cambio_eur || 0) +
+    ' · BRL $' + formatNumber(tc.cambio_brl || 0);
+
+  document.getElementById('cierreBilletes').innerHTML = BILLETES_DENOM.map(d =>
+    '<label class="billete-row"><span>$' + formatNumber(d) + '</span>' +
+    '<input type="number" min="0" step="1" id="bil_' + d + '" value="' + (c['bil_' + d] || 0) + '" placeholder="0" oninput="recalcCierre()"></label>'
+  ).join('');
+
+  document.getElementById('cierreColabs').innerHTML = '<div class="loading">Cargando colaboradores...</div>';
+  document.getElementById('modalNuevoCierre').classList.add('show');
+
+  try {
+    const asigs = await api('propinas_asignaciones?cierre_id=eq.' + cierreId + '&select=empleado_id,puntos') || [];
+    asigs.forEach(a => { CIERRE_EDIT_PUNTOS[a.empleado_id] = parseFloat(a.puntos) || 0; });
+  } catch (e) { /* si falla, arrancan en 0 */ }
+
+  await cargarColabsCierre(c.local);
+  recalcCierre();
+}
+window.abrirEditarCierre = abrirEditarCierre;
+
+let CIERRE_MULTI = [];  // candidatos multilocales para sumar al reparto de propinas
+function colabDesdeEmp(e, loc) {
+  const ap = e.apellido || '';
+  const pila = e.nombre_p || e.nombre || '';
+  const nombre = (ap && pila) ? (ap + ', ' + pila) : (ap || pila || ('Empleado #' + e.id));
+  const pts = CIERRE_EDITANDO ? (CIERRE_EDIT_PUNTOS[e.id] != null ? CIERRE_EDIT_PUNTOS[e.id] : 0) : 0;
+  return { id: e.id, nombre: nombre, multi: !!e.es_multilocal && e.local !== loc, puntos: pts };
+}
+async function cargarColabsCierre(localSlug) {
+  const loc = localSlug || PROP_LOCAL_SEL;
+  const cont = document.getElementById('cierreColabs');
+  try {
+    // Solo la gente del local (los multilocales se agregan a mano con el buscador de abajo)
+    const filtro = 'empleados?activo=eq.true&local=eq.' + encodeURIComponent(loc) +
+      '&select=id,nombre,apellido,nombre_p,local,es_multilocal&order=apellido.asc';
+    const emps = await api(filtro) || [];
+    CIERRE_COLABS = emps.map(function(e){ return colabDesdeEmp(e, loc); });
+
+    // Al editar un cierre viejo: reagregar personas (multilocales u otras) que ya tenian puntos y no son del local
+    if (CIERRE_EDITANDO) {
+      const yaIds = CIERRE_COLABS.map(function(c){ return c.id; });
+      const faltan = Object.keys(CIERRE_EDIT_PUNTOS).map(Number).filter(function(id){ return yaIds.indexOf(id) === -1; });
+      if (faltan.length) {
+        const extra = await api('empleados?id=in.(' + faltan.join(',') + ')&select=id,nombre,apellido,nombre_p,local,es_multilocal') || [];
+        extra.forEach(function(e){ CIERRE_COLABS.push(colabDesdeEmp(e, loc)); });
+      }
+    }
+
+    // Candidatos multilocales para el boton "+ Agregar persona multilocal"
+    try {
+      const multi = await api('empleados?activo=eq.true&es_multilocal=eq.true&select=id,nombre,apellido,nombre_p,local,es_multilocal&order=apellido.asc') || [];
+      CIERRE_MULTI = multi.map(function(e){ return colabDesdeEmp(e, loc); });
+    } catch (e2) { CIERRE_MULTI = []; }
+    renderColabsCierre();
+    recalcCierre();
+  } catch (e) {
+    cont.innerHTML = '<div class="loading" style="color:var(--c-error)">Error al cargar colaboradores</div>';
+  }
+}
+
+function renderColabsCierre() {
+  const cont = document.getElementById('cierreColabs');
+  let html = '';
+  if (!CIERRE_COLABS.length) {
+    html += '<div class="cierre-hint">No hay personas activas en este local. Podés agregar una persona multilocal abajo.</div>';
+  } else {
+    html += CIERRE_COLABS.map(function(c, idx) {
+      const opts = [['0','0'], ['0.5','½'], ['1','1']];
+      const seg = opts.map(function(o) {
+        return '<button type="button" class="puntos-btn' + (String(c.puntos) === o[0] ? ' active' : '') +
+          '" onclick="setPuntoColab(' + idx + ',' + o[0] + ')">' + o[1] + '</button>';
+      }).join('');
+      return '<div class="colab-row">' +
+        '<span class="colab-nombre">' + esc(c.nombre) + (c.multi ? ' <span class="colab-multi">multi</span>' : '') + '</span>' +
+        '<div class="puntos-seg">' + seg + '</div>' +
+        '</div>';
+    }).join('');
+  }
+  // Buscador para sumar una persona multilocal que no es de este local
+  const yaIds = CIERRE_COLABS.map(function(c){ return c.id; });
+  const disponibles = CIERRE_MULTI.filter(function(m){ return yaIds.indexOf(m.id) === -1; });
+  if (disponibles.length) {
+    html += '<div class="colab-add-wrap ped-ins-wrap">' +
+      '<input type="text" class="ped-ins-search" id="colabAddSearch" placeholder="+ Agregar persona multilocal..." autocomplete="off" ' +
+        'onfocus="filtrarMultiColab(this)" oninput="filtrarMultiColab(this)" onblur="ocultarMultiColab(this)">' +
+      '<div class="ped-ins-opts" id="colabAddOpts" style="display:none"></div>' +
+    '</div>';
+  }
+  cont.innerHTML = html;
+}
+window.filtrarMultiColab = function(input) {
+  const opts = document.getElementById('colabAddOpts');
+  if (!opts) return;
+  const yaIds = CIERRE_COLABS.map(function(c){ return c.id; });
+  const q = (input.value || '').toLowerCase().trim();
+  let lista = CIERRE_MULTI.filter(function(m){ return yaIds.indexOf(m.id) === -1; });
+  if (q) lista = lista.filter(function(m){ return m.nombre.toLowerCase().indexOf(q) !== -1; });
+  lista = lista.slice(0, 40);
+  if (!lista.length) {
+    opts.innerHTML = '<div class="ped-ins-no-result">Sin resultados</div>';
+  } else {
+    opts.innerHTML = lista.map(function(m){
+      return '<div class="ped-ins-opt" data-id="' + m.id + '" onclick="agregarMultiColab(' + m.id + ')">' + esc(m.nombre) + ' <span class="colab-multi">multi</span></div>';
+    }).join('');
+  }
+  opts.style.display = 'block';
+};
+window.ocultarMultiColab = function(input) {
+  const opts = document.getElementById('colabAddOpts');
+  setTimeout(function(){ if (opts) opts.style.display = 'none'; }, 400);
+};
+window.agregarMultiColab = function(id) {
+  const m = CIERRE_MULTI.find(function(x){ return x.id === id; });
+  if (!m) return;
+  if (CIERRE_COLABS.some(function(c){ return c.id === id; })) return;
+  CIERRE_COLABS.push({ id: m.id, nombre: m.nombre, multi: true, puntos: 0 });
+  renderColabsCierre();
+  recalcCierre();
+};
+
+window.setPuntoColab = function(idx, val) {
+  if (CIERRE_COLABS[idx]) CIERRE_COLABS[idx].puntos = val;
+  renderColabsCierre();
+  recalcCierre();
+};
+
+function resumenRow(k, v, hi) {
+  return '<div class="cierre-res-row' + (hi ? ' hi' : '') + '"><span>' + k + '</span><strong>' + v + '</strong></div>';
+}
+
+function recalcCierre() {
+  const tc = PROP_CONFIG || {};
+  let cash = 0;
+  BILLETES_DENOM.forEach(d => { cash += d * billeteVal(d); });
+  const extranjera = valNumCierre('cierreUsd') * (parseFloat(tc.cambio_usd) || 0) +
+                     valNumCierre('cierreEur') * (parseFloat(tc.cambio_eur) || 0) +
+                     valNumCierre('cierreBrl') * (parseFloat(tc.cambio_brl) || 0);
+  const electronico = valNumCierre('cierreTarjeta') + valNumCierre('cierreTransf');
+  const total = cash + extranjera + electronico;
+  const puntos = CIERRE_COLABS.reduce((s, c) => s + (parseFloat(c.puntos) || 0), 0);
+
+  const pctPreview = parseFloat((PROP_CONFIG || {}).porcentaje_admin) || 0;
+  const adminPreview = Math.round(total * pctPreview / 100);
+  const netoPreview = total - adminPreview;
+
+  document.getElementById('cierreResumen').innerHTML =
+    resumenRow('Total bruto', '$' + formatNumber(Math.round(total))) +
+    (pctPreview > 0 ? resumenRow('Administración (' + pctPreview + '%)', '− $' + formatNumber(adminPreview)) : '') +
+    resumenRow('Total a repartir', '$' + formatNumber(netoPreview), true) +
+    resumenRow('Puntos totales', puntos + (puntos > 0 ? '' : '  ⚠️ falta asignar'));
+}
+window.recalcCierre = recalcCierre;
+
+async function guardarCierre() {
+  const err = document.getElementById('cierreError'); err.textContent = '';
+  const tc = PROP_CONFIG || {};
+
+  const billetes = {};
+  let cash = 0;
+  BILLETES_DENOM.forEach(d => { const n = billeteVal(d); billetes['bil_' + d] = n; cash += d * n; });
+  const usd = valNumCierre('cierreUsd'), eur = valNumCierre('cierreEur'), brl = valNumCierre('cierreBrl');
+  const tarjeta = valNumCierre('cierreTarjeta'), transf = valNumCierre('cierreTransf');
+  const extranjera = usd * (parseFloat(tc.cambio_usd) || 0) + eur * (parseFloat(tc.cambio_eur) || 0) + brl * (parseFloat(tc.cambio_brl) || 0);
+  const bruto = cash + extranjera + tarjeta + transf;
+  const pct = parseFloat((PROP_CONFIG || {}).porcentaje_admin) || 0;
+  const montoAdmin = Math.round(bruto * pct / 100);
+  const neto = bruto - montoAdmin;  // lo que se reparte entre colaboradores
+  const colabs = CIERRE_COLABS.filter(c => (parseFloat(c.puntos) || 0) > 0);
+  const puntos = colabs.reduce((s, c) => s + parseFloat(c.puntos), 0);
+
+  if (bruto <= 0) { err.textContent = 'Cargá al menos un monto (efectivo, moneda extranjera o electrónico).'; return; }
+  if (puntos <= 0) { err.textContent = 'Asigná puntos a al menos un colaborador.'; return; }
+
+  const btn = document.getElementById('btnGuardarCierre');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  const ahora = new Date().toISOString();
+
+  const cierre = Object.assign({
+    local: CIERRE_LOCAL_ACTUAL,
+    fecha: document.getElementById('cierreFecha').value || hoyStr(),
+    turno: document.getElementById('cierreTurno').value,
+    monto_usd: usd, monto_eur: eur, monto_brl: brl,
+    tc_usd: parseFloat(tc.cambio_usd) || 0, tc_eur: parseFloat(tc.cambio_eur) || 0, tc_brl: parseFloat(tc.cambio_brl) || 0,
+    monto_tarjeta: tarjeta, monto_transferencia: transf,
+    porcentaje_admin: pct,
+    total_bruto: Math.round(bruto), total_neto: Math.round(neto), total_puntos: puntos,
+    comentario: (document.getElementById('cierreComentario').value || '').trim() || null,
+    actualizado_en: ahora
+  }, billetes);
+  if (!CIERRE_EDITANDO) {
+    cierre.pagado = false;
+    cierre.creado_por = currentUser.id;
+    cierre.creado_en = ahora;
+  }
+
+  try {
+    let cierreId;
+    if (CIERRE_EDITANDO) {
+      await api('propinas_cierres?id=eq.' + CIERRE_EDITANDO, { method: 'PATCH', body: JSON.stringify(cierre) });
+      cierreId = CIERRE_EDITANDO;
+      // Reemplazo las asignaciones: borro las viejas y cargo las nuevas
+      await api('propinas_asignaciones?cierre_id=eq.' + cierreId, { method: 'DELETE' });
+    } else {
+      const res = await api('propinas_cierres', { method: 'POST', body: JSON.stringify(cierre) });
+      const nuevo = Array.isArray(res) ? res[0] : res;
+      cierreId = nuevo.id;
+    }
+
+    const asigs = colabs.map(c => ({
+      cierre_id: cierreId,
+      empleado_id: c.id,
+      puntos: c.puntos,
+      monto: Math.round((neto * c.puntos / puntos) * 100) / 100
+    }));
+    if (asigs.length) {
+      await api('propinas_asignaciones', { method: 'POST', body: JSON.stringify(asigs) });
+    }
+
+    closeNuevoCierre();
+    toast(CIERRE_EDITANDO ? '✓ Cierre actualizado' : ('✓ Cierre guardado y repartido entre ' + colabs.length + ' colaboradores'), 'success');
+    PROP_CIERRES = await api('propinas_cierres?order=fecha.desc,id.desc') || [];
+    renderPropGestKpis();
+    renderPropGestTabla();
+  } catch (e) {
+    err.textContent = 'Error al guardar el cierre: ' + ((e && e.message) || e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar cierre';
+  }
+}
+window.guardarCierre = guardarCierre;
+window.closeNuevoCierre = function() {
+  document.getElementById('modalNuevoCierre').classList.remove('show');
+};
+
+// ============================================
+// EXPORTAR LIQUIDACIÓN DE PROPINAS (Excel)
+// ============================================
+const TURNOS_LIQ = { mediodia: 'Mediodía', 'mediodía': 'Mediodía', noche: 'Noche', evento: 'Evento', especial: 'Especial' };
+
+function fmtFechaDDMM(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + '/' + m[2] + '/' + m[1]) : (iso || '');
+}
+
+window.abrirLiquidacion = function() {
+  if (!puedeGestionarPropinas()) { toast('No tenés permiso', 'error'); return; }
+  const localesUser = localesPropinasUsuario();
+  // Pre-cargar el período para que cubra los cierres pendientes de liquidar
+  const pendientes = (PROP_CIERRES || []).filter(c => !c.pagado && c.fecha && localesUser.includes(c.local));
+  let desde, hasta;
+  if (pendientes.length) {
+    const fechas = pendientes.map(c => c.fecha).sort();
+    desde = fechas[0];
+    hasta = fechas[fechas.length - 1];
+  } else {
+    const hoy = new Date();
+    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    desde = primero.toISOString().slice(0, 10);
+    hasta = hoyStr();
+  }
+  document.getElementById('liqDesde').value = desde;
+  document.getElementById('liqHasta').value = hasta;
+  document.getElementById('liqError').textContent = '';
+  document.getElementById('modalLiquidacion').classList.add('show');
+};
+window.closeLiquidacion = function() {
+  document.getElementById('modalLiquidacion').classList.remove('show');
+};
+
+window.generarLiquidacion = async function() {
+  const err = document.getElementById('liqError'); err.textContent = '';
+  const desde = document.getElementById('liqDesde').value;
+  const hasta = document.getElementById('liqHasta').value;
+  if (!desde || !hasta) { err.textContent = 'Elegí el período (desde y hasta).'; return; }
+  if (desde > hasta) { err.textContent = 'La fecha "desde" no puede ser posterior a "hasta".'; return; }
+
+  const btn = document.getElementById('btnGenerarLiq');
+  btn.disabled = true; btn.textContent = 'Generando...';
+
+  try {
+    const localesUser = localesPropinasUsuario();
+
+    // Respetar el filtro activo en pantalla
+    const slugTodos = getSlugTransversal();
+    const localActivo = (PROP_LOCAL_SEL && PROP_LOCAL_SEL !== slugTodos && localesUser.includes(PROP_LOCAL_SEL))
+      ? PROP_LOCAL_SEL : null;
+    const localesFiltro = localActivo ? [localActivo] : localesUser;
+
+    let cierres = await api('propinas_cierres?fecha=gte.' + desde + '&fecha=lte.' + hasta + '&order=fecha.asc') || [];
+    cierres = cierres.filter(c => localesFiltro.includes(c.local));
+    if (!cierres.length) {
+      err.textContent = 'No hay cierres en ese período' + (localActivo ? ' para ' + localLabel(localActivo) : '') + '.';
+      btn.disabled = false; btn.textContent = 'Generar Excel';
+      return;
+    }
+
+    const cierreMap = {};
+    cierres.forEach(c => { cierreMap[c.id] = c; });
+    const ids = cierres.map(c => c.id);
+
+    const asigs = await api('propinas_asignaciones?cierre_id=in.(' + ids.join(',') + ')&select=*') || [];
+    if (!asigs.length) {
+      err.textContent = 'Los cierres del período no tienen colaboradores cargados.';
+      btn.disabled = false; btn.textContent = 'Generar Excel';
+      return;
+    }
+
+    const empIds = Array.from(new Set(asigs.map(a => a.empleado_id)));
+    const emps = await api('empleados?id=in.(' + empIds.join(',') + ')&select=id,nombre,apellido,nombre_p,alias') || [];
+    const empMap = {};
+    const aliasMap = {};
+    emps.forEach(e => {
+      const ap = e.apellido || '';
+      const pila = e.nombre_p || e.nombre || '';
+      empMap[e.id] = (ap && pila) ? (ap + ', ' + pila) : (ap || pila || ('Empleado #' + e.id));
+      aliasMap[e.id] = e.alias || '';
+    });
+    const nombreEmp = id => empMap[id] || ('Empleado #' + id);
+
+    // ---- DETALLE por cierre ----
+    const detalleColabs = asigs.map(a => {
+      const c = cierreMap[a.cierre_id] || {};
+      return {
+        'Empleado': nombreEmp(a.empleado_id),
+        'Local': localLabel(c.local) || c.local || '',
+        'Fecha': fmtFechaDDMM(c.fecha),
+        'Turno': TURNOS_LIQ[(c.turno || '').toLowerCase()] || c.turno || '',
+        'Estado': c.pagado ? 'Pagado' : 'Pendiente',
+        'Puntos': parseFloat(a.puntos) || 0,
+        'Monto': parseFloat(a.monto) || 0
+      };
+    });
+    const detalleAdmin = cierres
+      .filter(c => (parseFloat(c.porcentaje_admin) || 0) > 0)
+      .map(c => {
+        const pctC = parseFloat(c.porcentaje_admin) || 0;
+        const montoAdminC = Math.round((parseFloat(c.total_bruto) || 0) * pctC / 100);
+        return {
+          'Empleado': 'Administración (' + pctC + '%)',
+          'Local': localLabel(c.local) || c.local || '',
+          'Fecha': fmtFechaDDMM(c.fecha),
+          'Turno': TURNOS_LIQ[(c.turno || '').toLowerCase()] || c.turno || '',
+          'Estado': c.pagado ? 'Pagado' : 'Pendiente',
+          'Puntos': '-',
+          'Monto': montoAdminC
+        };
+      });
+    const detalle = [...detalleColabs, ...detalleAdmin].sort((x, y) =>
+      x.Fecha.localeCompare(y.Fecha) ||
+      x.Local.localeCompare(y.Local, 'es') ||
+      x.Empleado.localeCompare(y.Empleado, 'es')
+    );
+
+    // ---- RESUMEN POR EMPLEADO ----
+    const grupos = {};
+    asigs.forEach(a => {
+      const c = cierreMap[a.cierre_id] || {};
+      const id = a.empleado_id;
+      if (!grupos[id]) grupos[id] = { empId: id, cierres: 0, puntos: 0, pendiente: 0, pagado: 0, locales: {} };
+      const g = grupos[id];
+      g.cierres += 1;
+      g.puntos += parseFloat(a.puntos) || 0;
+      const m = parseFloat(a.monto) || 0;
+      if (c.pagado) g.pagado += m; else g.pendiente += m;
+      const locLbl = localLabel(c.local) || c.local || '';
+      if (locLbl) g.locales[locLbl] = true;
+    });
+    const resumenColabs = Object.keys(grupos).map(id => {
+      const g = grupos[id];
+      return {
+        'Empleado': nombreEmp(g.empId),
+        'Locales': Object.keys(g.locales).sort((a, b) => a.localeCompare(b, 'es')).join(', '),
+        'Cierres': g.cierres,
+        'Puntos': g.puntos,
+        'Pendiente': Math.round(g.pendiente * 100) / 100,
+        'Pagado': Math.round(g.pagado * 100) / 100,
+        'Total': Math.round((g.pendiente + g.pagado) * 100) / 100,
+        'Alias': aliasMap[g.empId] || ''
+      };
+    }).sort((x, y) => x.Empleado.localeCompare(y.Empleado, 'es'));
+
+    const gruposAdmin = {};
+    cierres.forEach(c => {
+      const pctC = parseFloat(c.porcentaje_admin) || 0;
+      if (!pctC) return;
+      const loc = localLabel(c.local) || c.local || '';
+      if (!gruposAdmin[loc]) gruposAdmin[loc] = { pendiente: 0, pagado: 0, cierres: 0, pct: pctC };
+      const montoAdminC = Math.round((parseFloat(c.total_bruto) || 0) * pctC / 100);
+      gruposAdmin[loc].cierres += 1;
+      if (c.pagado) gruposAdmin[loc].pagado += montoAdminC;
+      else gruposAdmin[loc].pendiente += montoAdminC;
+    });
+    const resumenAdmin = Object.keys(gruposAdmin).sort().map(loc => {
+      const g = gruposAdmin[loc];
+      return {
+        'Empleado': 'Administración (' + g.pct + '%)',
+        'Locales': loc,
+        'Cierres': g.cierres,
+        'Puntos': '-',
+        'Pendiente': Math.round(g.pendiente * 100) / 100,
+        'Pagado': Math.round(g.pagado * 100) / 100,
+        'Total': Math.round((g.pendiente + g.pagado) * 100) / 100,
+        'Alias': ''
+      };
+    });
+    const resumenEmp = [...resumenColabs, ...resumenAdmin];
+
+    // ---- RESUMEN POR LOCAL ----
+    const gruposLocal = {};
+    cierres.forEach(c => {
+      const loc = localLabel(c.local) || c.local || '';
+      if (!gruposLocal[loc]) gruposLocal[loc] = { cierres: 0, empleados: new Set(), puntos: 0, pendiente: 0, pagado: 0 };
+      gruposLocal[loc].cierres += 1;
+    });
+    asigs.forEach(a => {
+      const c = cierreMap[a.cierre_id] || {};
+      const loc = localLabel(c.local) || c.local || '';
+      if (!gruposLocal[loc]) return;
+      gruposLocal[loc].empleados.add(a.empleado_id);
+      gruposLocal[loc].puntos += parseFloat(a.puntos) || 0;
+      const m = parseFloat(a.monto) || 0;
+      if (c.pagado) gruposLocal[loc].pagado += m; else gruposLocal[loc].pendiente += m;
+    });
+    cierres.forEach(c => {
+      const pctC = parseFloat(c.porcentaje_admin) || 0;
+      if (!pctC) return;
+      const loc = localLabel(c.local) || c.local || '';
+      if (!gruposLocal[loc]) return;
+      const montoAdminC = Math.round((parseFloat(c.total_bruto) || 0) * pctC / 100);
+      if (c.pagado) gruposLocal[loc].pagado += montoAdminC; else gruposLocal[loc].pendiente += montoAdminC;
+    });
+    const resumenLocal = Object.keys(gruposLocal).sort((a, b) => a.localeCompare(b, 'es')).map(loc => {
+      const g = gruposLocal[loc];
+      return {
+        'Local': loc,
+        'Cierres': g.cierres,
+        'Empleados': g.empleados.size,
+        'Puntos distribuidos': Math.round(g.puntos * 10) / 10,
+        'Pendiente': Math.round(g.pendiente * 100) / 100,
+        'Pagado': Math.round(g.pagado * 100) / 100,
+        'Total': Math.round(g.pendiente + g.pagado)
+      };
+    });
+
+    // Nombre con sufijo de local si hay filtro activo
+    const sufLocal = localActivo ? '_' + (localLabel(localActivo) || localActivo).replace(/[\s\/\\]/g, '') : '';
+    const nombreArchivo = 'Liquidacion_propinas_AZUCA_' + desde + '_a_' + hasta + sufLocal + '.xlsx';
+
+    exportarAExcel(nombreArchivo, [
+      { nombre: 'Resumen por empleado', filas: resumenEmp  },
+      { nombre: 'Resumen por local',    filas: resumenLocal },
+      { nombre: 'Detalle por cierre',   filas: detalle      }
+    ]);
+    closeLiquidacion();
+    toast('\u2713 Liquidación generada (' + cierres.length + ' cierres)', 'success');
+  } catch (e) {
+    err.textContent = 'Error al generar la liquidación. Reintentá.';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generar Excel';
+  }
+};
+
+// ============================================
+// MÓDULO RECETAS — SUB-ELABORACIONES (tipo = elaboracion)
+// ============================================
+let RECETAS_DB = [];            // sub-elaboraciones activas
+let RECETAS_COSTO = {};         // receta_id -> costo_mp (de la vista)
+let RECETAS_INSUMOS_VAL = [];   // insumos validados (para el picker)
+let RECETA_FILTRO_LOCAL = '';
+let RECETA_EDITANDO = null;
+let RECETA_COMP_EDIT = [];      // componentes en edición
+const UNIDADES_RECETA = ['kg', 'g', 'l', 'ml', 'unidad', 'porción'];
+let RECETA_TIPO = 'elaboracion';     // sección activa: 'elaboracion' | 'plato'
+let RECETAS_VIEW = {};               // receta_id -> fila de v_costeo_recetas
+let RECETAS_ELAB_PICKER = [];        // sub-elaboraciones disponibles como componente
+const FOOD_COST_SALUDABLE = 35;      // % de food cost saludable (badge verde)
+let RECETA_COMP_VIEJOS = [];         // ids de componentes existentes (para borrar al editar)
+let COSTEO_INSUMOS = {};             // id -> {costo, cant_pres, unidad}
+let COSTEO_RECETAS = {};             // id -> {rendimiento, unidad_rendimiento, tipo, precio_venta}
+let COSTEO_COMPS = {};               // receta_id -> [componentes]
+let RECETAS_COSTO_CALC = {};         // id -> costo total calculado correctamente
+let COSTEO_PASOS = {};               // menu_id -> [pasos]
+let RECETAS_PLATOS_PICKER = [];      // platos disponibles como paso de menú
+let MENU_PASOS_EDIT = [];            // pasos en edición
+let MENU_PASOS_VIEJOS = [];          // ids de pasos existentes (para borrar al editar)
+let COSTEO_CARGADO = false;          // cache: evita recargar el costeo en cada cambio de pestaña
+
+function puedeGestionarRecetas() {
+  return isMaster() || isAdmin() || (currentUser && currentUser.editor_recetas === true);
+}
+
+// Cantidad con decimales (no redondea como formatNumber, que es para pesos)
+function fmtCant(n) {
+  return (parseFloat(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 });
+}
+
+// ============================================
+// MÓDULO MIS DATOS (el empleado edita su propia ficha)
+// ============================================
+function openMisDatos() {
+  showView('vMisDatos');
+  cargarMisDatos();
+}
+window.openMisDatos = openMisDatos;
+
+function opcionesTalle(valores, sel) {
+  return '<option value="">—</option>' + valores.map(v =>
+    '<option value="' + v + '"' + (String(v) === String(sel || '') ? ' selected' : '') + '>' + v + '</option>').join('');
+}
+
+async function cargarMisDatos() {
+  const form = document.getElementById('misDatosForm');
+  const noFicha = document.getElementById('misDatosNoFicha');
+  if (!currentUser || !currentUser.empleado_id) {
+    if (form) form.style.display = 'none';
+    if (noFicha) noFicha.style.display = '';
+    return;
+  }
+  if (noFicha) noFicha.style.display = 'none';
+  if (form) form.style.display = '';
+  try {
+    const emps = await api('empleados?id=eq.' + currentUser.empleado_id + '&select=*');
+    if (emps && emps.length) currentEmpleado = emps[0];
+  } catch (e) {}
+  const e = currentEmpleado || {};
+  document.getElementById('miNombre').value = e.nombre_p || e.nombre || '';
+  document.getElementById('miApellido').value = e.apellido || '';
+  document.getElementById('miDocumento').value = e.documento || '';
+  document.getElementById('miFechaNac').value = e.fecha_nac || '';
+  document.getElementById('miTelefono').value = e.telefono || '';
+  document.getElementById('miEmail').value = e.email || '';
+  document.getElementById('miAlias').value = e.alias || '';
+  const pantalones = []; for (let i = 36; i <= 56; i += 2) pantalones.push(i);
+  const calzados = []; for (let i = 35; i <= 46; i++) calzados.push(i);
+  document.getElementById('miTalleRemera').innerHTML = opcionesTalle(['XS','S','M','L','XL','XXL','XXXL'], e.talle_remera);
+  document.getElementById('miTallePantalon').innerHTML = opcionesTalle(pantalones, e.talle_pantalon);
+  document.getElementById('miTalleCalzado').innerHTML = opcionesTalle(calzados, e.talle_calzado);
+  document.getElementById('misDatosError').textContent = '';
+  document.getElementById('misDatosOk').textContent = '';
+}
+
+window.guardarMisDatos = async function() {
+  if (!currentUser || !currentUser.empleado_id) return;
+  const err = document.getElementById('misDatosError'); err.textContent = '';
+  const ok = document.getElementById('misDatosOk'); ok.textContent = '';
+  const nombre = document.getElementById('miNombre').value.trim();
+  if (!nombre) { err.textContent = 'El nombre no puede quedar vacío.'; return; }
+  const email = document.getElementById('miEmail').value.trim();
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) { err.textContent = 'Revisá el email, no parece válido.'; return; }
+  const datos = {
+    nombre: nombre,
+    nombre_p: nombre,
+    apellido: document.getElementById('miApellido').value.trim() || null,
+    documento: document.getElementById('miDocumento').value.trim() || null,
+    fecha_nac: document.getElementById('miFechaNac').value || null,
+    telefono: document.getElementById('miTelefono').value.trim() || null,
+    email: email || null,
+    alias: document.getElementById('miAlias').value.trim() || null,
+    talle_remera: document.getElementById('miTalleRemera').value || null,
+    talle_pantalon: document.getElementById('miTallePantalon').value || null,
+    talle_calzado: document.getElementById('miTalleCalzado').value || null
+  };
+  const btn = document.getElementById('btnGuardarMisDatos');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    await api('empleados?id=eq.' + currentUser.empleado_id, { method: 'PATCH', body: JSON.stringify(datos) });
+    if (!currentEmpleado) currentEmpleado = {};
+    Object.assign(currentEmpleado, datos);
+    ok.textContent = '✓ Tus datos se guardaron correctamente.';
+    toast('✓ Datos guardados', 'success');
+  } catch (e) {
+    err.textContent = 'Error al guardar: ' + (e && e.message ? e.message.slice(0, 150) : e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+};
+
+function openMisRecetas() {
+  showView('vMisRecetas');
+  RECETA_TIPO = 'elaboracion';
+  COSTEO_CARGADO = false;
+  actualizarTabsReceta();
+  RECETA_FILTRO_LOCAL = '';
+  const s = document.getElementById('recetaSearch'); if (s) s.value = '';
+  const fl = document.getElementById('recetaFiltroLocal'); if (fl) fl.value = '';
+  const btn = document.getElementById('recetaNuevoBtn');
+  if (btn) btn.style.display = puedeGestionarRecetas() ? '' : 'none';
+  cargarRecetas();
+}
+window.openMisRecetas = openMisRecetas;
+
+function actualizarTabsReceta() {
+  const te = document.getElementById('tabElaboracion');
+  const tp = document.getElementById('tabPlato');
+  const tm = document.getElementById('tabMenu');
+  if (te) te.classList.toggle('active', RECETA_TIPO === 'elaboracion');
+  if (tp) tp.classList.toggle('active', RECETA_TIPO === 'plato');
+  if (tm) tm.classList.toggle('active', RECETA_TIPO === 'menu');
+  const s = document.getElementById('recetaSearch');
+  if (s) s.placeholder = RECETA_TIPO === 'menu' ? 'Buscar menú...' : (RECETA_TIPO === 'plato' ? 'Buscar plato...' : 'Buscar sub-elaboración...');
+}
+
+window.cambiarSeccionReceta = function(tipo) {
+  RECETA_TIPO = tipo;
+  actualizarTabsReceta();
+  const s = document.getElementById('recetaSearch'); if (s) s.value = '';
+  const fl = document.getElementById('recetaFiltroLocal'); if (fl) fl.value = '';
+  cargarRecetas();
+};
+
+function unitCostInsumoCosteo(ins) {
+  return (parseFloat(ins.costo) || 0) / (parseFloat(ins.cant_pres) || 1);
+}
+
+// Costo total de una receta, recorriendo insumos y sub-elaboraciones (recursivo, con memo y guarda de ciclos)
+function computeCostoReceta(id, cache, stack) {
+  if (cache[id] != null) return cache[id];
+  if (stack[id]) return 0;               // evita bucles infinitos
+  stack[id] = true;
+  let total = 0;
+  const rec = COSTEO_RECETAS[id];
+  if (rec && rec.tipo === 'menu') {
+    const pasos = COSTEO_PASOS[id] || [];
+    for (let k = 0; k < pasos.length; k++) {
+      if (pasos[k].opcional) continue;
+      total += computeCostoReceta(pasos[k].receta_id, cache, stack);
+    }
+  } else {
+    const comps = COSTEO_COMPS[id] || [];
+    for (let k = 0; k < comps.length; k++) {
+      const c = comps[k];
+      const cant = parseFloat(c.cantidad) || 0;
+      if (c.tipo_componente === 'ingrediente') {
+        const ins = COSTEO_INSUMOS[c.ingrediente_id];
+        if (!ins) continue;
+        const conv = convertirCantidad(cant, c.unidad, ins.unidad);
+        if (conv != null) total += conv * unitCostInsumoCosteo(ins);
+      } else {
+        const sub = COSTEO_RECETAS[c.sub_receta_id];
+        if (!sub) continue;
+        const subTotal = computeCostoReceta(c.sub_receta_id, cache, stack);
+        const rend = parseFloat(sub.rendimiento) || 0;
+        const ucSub = rend > 0 ? subTotal / rend : 0;
+        const conv = convertirCantidad(cant, c.unidad, sub.unidad_rendimiento);
+        if (conv != null) total += conv * ucSub;
+      }
+    }
+  }
+  delete stack[id];
+  cache[id] = total;
+  return total;
+}
+
+// Carga todo el árbol de recetas/insumos y precalcula el costo de cada receta
+async function cargarDatosCosteo() {
+  if (COSTEO_CARGADO) return;
+  const recs = await api('recetas?select=id,tipo,rendimiento,unidad_rendimiento,precio_venta') || [];
+  const comps = await api('receta_componentes?select=receta_id,tipo_componente,ingrediente_id,sub_receta_id,cantidad,unidad') || [];
+  const inss = await api('ingredientes?activo=eq.true&select=id,costo,cantidad_por_presentacion,unidad') || [];
+  const pasos = await api('menu_pasos?select=menu_id,receta_id,orden,opcional') || [];
+  COSTEO_PASOS = {};
+  pasos.forEach(p => { (COSTEO_PASOS[p.menu_id] = COSTEO_PASOS[p.menu_id] || []).push(p); });
+  COSTEO_RECETAS = {};
+  recs.forEach(r => { COSTEO_RECETAS[r.id] = r; });
+  COSTEO_COMPS = {};
+  comps.forEach(c => { (COSTEO_COMPS[c.receta_id] = COSTEO_COMPS[c.receta_id] || []).push(c); });
+  COSTEO_INSUMOS = {};
+  inss.forEach(i => { COSTEO_INSUMOS[i.id] = { costo: i.costo, cant_pres: i.cantidad_por_presentacion, unidad: i.unidad }; });
+  RECETAS_COSTO_CALC = {};
+  const cache = {};
+  Object.keys(COSTEO_RECETAS).forEach(id => {
+    try {
+      RECETAS_COSTO_CALC[id] = computeCostoReceta(parseInt(id, 10), cache, {});
+    } catch (e) {
+      RECETAS_COSTO_CALC[id] = 0;
+    }
+  });
+  COSTEO_CARGADO = true;
+}
+
+async function cargarRecetas() {
+  const lista = document.getElementById('recetasLista');
+  const etiqueta = RECETA_TIPO === 'menu' ? 'menús' : (RECETA_TIPO === 'plato' ? 'platos' : 'sub-elaboraciones');
+  if (lista) lista.innerHTML = '<div class="loading">Cargando ' + etiqueta + '...</div>';
+  // 1) Lo esencial: la lista. Si esto falla, mostramos el motivo real.
+  try {
+    RECETAS_DB = await api('recetas?tipo=eq.' + RECETA_TIPO + '&activo=eq.true&select=*&order=nombre.asc') || [];
+  } catch (e) {
+    if (lista) lista.innerHTML = '<div class="empty-list" style="color:var(--c-error)">No se pudo cargar la lista. Revisá la conexión y volvé a entrar.<br><span style="font-size:11px;opacity:.7">' + esc(String((e && e.message) || e)) + '</span></div>';
+    return;
+  }
+  // 2) Costeo: si falla (ej: señal mala), igual mostramos la lista (sin costos)
+  try { await cargarDatosCosteo(); } catch (e) { console.warn('Costeo no disponible:', e); }
+  // 3) Datos para editar: no deben bloquear la lista
+  try {
+    if (!RECETAS_INSUMOS_VAL.length) {
+      RECETAS_INSUMOS_VAL = await api('ingredientes?validado=eq.true&activo=eq.true&select=id,nombre,unidad,costo,cantidad_por_presentacion&order=nombre.asc') || [];
+    }
+    if (!RECETAS_ELAB_PICKER.length) {
+      RECETAS_ELAB_PICKER = await api('recetas?tipo=eq.elaboracion&activo=eq.true&select=id,nombre,unidad_rendimiento,rendimiento&order=nombre.asc') || [];
+    }
+    if (!RECETAS_PLATOS_PICKER.length) {
+      RECETAS_PLATOS_PICKER = await api('recetas?tipo=eq.plato&activo=eq.true&select=id,nombre&order=nombre.asc') || [];
+    }
+  } catch (e) { console.warn('Datos de edición no disponibles:', e); }
+  poblarFiltroLocalReceta();
+  renderRecetas();
+}
+
+function poblarFiltroLocalReceta() {
+  const sel = document.getElementById('recetaFiltroLocal');
+  if (!sel) return;
+  const locales = Array.from(new Set(RECETAS_DB.map(r => r.local).filter(Boolean)))
+    .sort((a, b) => (localLabel(a) || a).localeCompare(localLabel(b) || b, 'es'));
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Todos los locales</option>' +
+    locales.map(l => '<option value="' + esc(l) + '">' + esc(localLabel(l)) + '</option>').join('');
+  sel.value = prev;
+}
+
+function recetasFiltradas() {
+  const q = normalizar((document.getElementById('recetaSearch') || {}).value);
+  const fLocal = (document.getElementById('recetaFiltroLocal') || {}).value || '';
+  return RECETAS_DB.filter(r => {
+    if (fLocal) {
+      // un local muestra sus recetas + las TRANSVERSAL (globales)
+      if (r.local !== fLocal && !/transversal/i.test(r.local || '')) return false;
+    }
+    if (q && normalizar(r.nombre).indexOf(q) === -1) return false;
+    return true;
+  });
+}
+
+function renderRecetas() {
+  const lista = document.getElementById('recetasLista');
+  if (!lista) return;
+  const items = recetasFiltradas();
+  const esPlato = RECETA_TIPO === 'plato';
+  const esMenu = RECETA_TIPO === 'menu';
+  const fmtPct = n => (parseFloat(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const cnt = document.getElementById('recetasCount');
+  if (cnt) {
+    const sing = esMenu ? 'menú' : (esPlato ? 'plato' : 'sub-elaboración');
+    const plur = esMenu ? 'menús' : (esPlato ? 'platos' : 'sub-elaboraciones');
+    cnt.textContent = items.length + ' ' + (items.length === 1 ? sing : plur);
+  }
+  if (!items.length) {
+    lista.innerHTML = '<div class="empty-list">No hay resultados con ese criterio</div>';
+    return;
+  }
+  const gestiona = puedeGestionarRecetas();
+  lista.innerHTML = items.map(r => {
+    const transversal = /transversal/i.test(r.local || '');
+    const costo = RECETAS_COSTO_CALC[r.id] || 0;
+    const head =
+      '<div class="rc-top">' +
+        '<div class="rc-name">' + esc(r.nombre) + '</div>' +
+        '<span class="rc-localbadge' + (transversal ? ' transv' : '') + '">' + esc(localLabel(r.local)) + '</span>' +
+      '</div>';
+
+    let meta;
+    if (esPlato || esMenu) {
+      const precio = parseFloat(r.precio_venta) || 0;
+      const fc = precio > 0 ? (costo / precio * 100) : 0;
+      const margen = precio - costo;
+      let pre;
+      if (esMenu) {
+        const nPasos = (COSTEO_PASOS[r.id] || []).length;
+        pre = '<span class="rc-cat">' + nPasos + (nPasos === 1 ? ' paso' : ' pasos') + '</span>';
+      } else {
+        pre = r.categoria ? ('<span class="rc-cat">' + esc(r.categoria) + '</span>') : '';
+      }
+      let l2;
+      if (precio > 0) {
+        l2 = '<span><i class="ti ti-coin"></i> costo $' + formatNumber(Math.round(costo)) + '</span>' +
+             '<span><i class="ti ti-tag"></i> venta $' + formatNumber(Math.round(precio)) + '</span>' +
+             '<span class="rc-fc' + (fc <= FOOD_COST_SALUDABLE ? ' ok' : ' alto') + '">FC ' + fmtPct(fc) + '%</span>' +
+             '<span><i class="ti ti-trending-up"></i> margen $' + formatNumber(Math.round(margen)) + '</span>';
+      } else {
+        l2 = '<span><i class="ti ti-coin"></i> costo $' + formatNumber(Math.round(costo)) + '</span>' +
+             '<span class="rc-fc sinprecio">Sin precio</span>';
+      }
+      meta = '<div class="rc-meta">' + pre + l2 + '</div>';
+    } else {
+      const rend = parseFloat(r.rendimiento) || 0;
+      const unidad = r.unidad_rendimiento || '';
+      const costoUnit = rend > 0 ? (costo / rend) : 0;
+      meta = '<div class="rc-meta">' +
+        '<span><i class="ti ti-scale"></i> rinde ' + fmtCant(rend) + ' ' + esc(unidad) + '</span>' +
+        '<span><i class="ti ti-coin"></i> $' + formatNumber(Math.round(costo)) + (rend > 0 ? (' · $' + formatNumber(Math.round(costoUnit)) + '/' + esc(unidad)) : '') + '</span>' +
+      '</div>';
+    }
+    return '<div class="receta-card"' + (gestiona ? ' onclick="abrirEditarSubelab(' + r.id + ')" style="cursor:pointer"' : '') + '>' + head + meta + '</div>';
+  }).join('');
+}
+
+// ---- Alta / edición ----
+function opcionesLocalReceta(sel) {
+  const locales = getLocalesActivos();
+  return locales.map(l => '<option value="' + esc(l) + '"' + (l === sel ? ' selected' : '') + '>' + esc(localLabel(l)) + '</option>').join('');
+}
+function opcionesUnidad(sel) {
+  return UNIDADES_RECETA.map(u => '<option value="' + u + '"' + (u === sel ? ' selected' : '') + '>' + u + '</option>').join('');
+}
+
+function configurarCamposModal() {
+  const t = RECETA_TIPO;
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('rendimientoCampos', t !== 'menu');
+  show('categoriaCampo', t === 'plato');
+  show('precioCampo', t === 'plato' || t === 'menu');
+  show('componentesSection', t !== 'menu');
+  show('menuPasosSection', t === 'menu');
+}
+
+window.poblarPlatosPicker = function() {
+  const sel = document.getElementById('pasoPlato');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Elegí un plato...</option>' +
+    RECETAS_PLATOS_PICKER.map(p => '<option value="' + p.id + '">' + esc(p.nombre) + '</option>').join('');
+};
+
+window.agregarPaso = function() {
+  const sel = document.getElementById('pasoPlato');
+  const id = parseInt(sel.value, 10);
+  if (!id) { toast('Elegí un plato', 'error'); return; }
+  const plato = RECETAS_PLATOS_PICKER.find(p => p.id === id);
+  MENU_PASOS_EDIT.push({ receta_id: id, nombre: plato ? plato.nombre : ('Plato #' + id), nombre_paso: '', opcional: false });
+  sel.value = '';
+  renderPasosEdit();
+};
+
+window.quitarPaso = function(idx) {
+  MENU_PASOS_EDIT.splice(idx, 1);
+  renderPasosEdit();
+};
+
+window.setPasoNombre = function(idx, val) {
+  if (MENU_PASOS_EDIT[idx]) MENU_PASOS_EDIT[idx].nombre_paso = val;
+};
+
+window.setPasoOpcional = function(idx, checked) {
+  if (MENU_PASOS_EDIT[idx]) { MENU_PASOS_EDIT[idx].opcional = checked; renderPasosEdit(); }
+};
+
+function renderPasosEdit() {
+  const cont = document.getElementById('pasosLista');
+  if (!cont) return;
+  if (!MENU_PASOS_EDIT.length) {
+    cont.innerHTML = '<div class="cierre-hint">Todavía no agregaste pasos.</div>';
+    return;
+  }
+  let total = 0;
+  const filas = MENU_PASOS_EDIT.map((p, idx) => {
+    const costoPlato = RECETAS_COSTO_CALC[p.receta_id] || 0;
+    if (!p.opcional) total += costoPlato;
+    return '<div class="comp-row">' +
+      '<div class="comp-info" style="flex:1;">' +
+        '<span class="comp-nombre"><strong>' + (idx + 1) + '.</strong> ' + esc(p.nombre) + '</span>' +
+        '<span class="comp-costo">costo $' + formatNumber(Math.round(costoPlato)) + (p.opcional ? ' · <span class="comp-duda">opcional (no suma)</span>' : '') + '</span>' +
+        '<div class="paso-controls">' +
+          '<input type="text" class="paso-nombre" placeholder="Nombre del paso (ej: Entrada)" value="' + esc(p.nombre_paso || '') + '" oninput="setPasoNombre(' + idx + ', this.value)">' +
+          '<label class="paso-opc"><input type="checkbox" ' + (p.opcional ? 'checked' : '') + ' onchange="setPasoOpcional(' + idx + ', this.checked)"> opcional</label>' +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="comp-del" onclick="quitarPaso(' + idx + ')" aria-label="Quitar"><i class="ti ti-trash"></i></button>' +
+    '</div>';
+  }).join('');
+  const totalLinea = '<div class="comp-total">Costo del menú: <strong>$' + formatNumber(Math.round(total)) + '</strong>' +
+    '<div class="comp-total-hint">Suma los platos no opcionales. El food cost se ve en la lista.</div></div>';
+  cont.innerHTML = filas + totalLinea;
+}
+
+async function cargarPasosEnEditor(id) {
+  const cont = document.getElementById('pasosLista');
+  if (cont) cont.innerHTML = '<div class="loading">Cargando pasos...</div>';
+  try {
+    const pasos = await api('menu_pasos?menu_id=eq.' + id + '&select=*&order=orden') || [];
+    MENU_PASOS_VIEJOS = pasos.map(p => p.id);
+    MENU_PASOS_EDIT = pasos.map(p => {
+      const plato = RECETAS_PLATOS_PICKER.find(x => x.id === p.receta_id);
+      return { receta_id: p.receta_id, nombre: plato ? plato.nombre : ('Plato #' + p.receta_id), nombre_paso: p.nombre_paso || '', opcional: !!p.opcional };
+    });
+    renderPasosEdit();
+  } catch (e) {
+    if (cont) cont.innerHTML = '<div class="cierre-hint" style="color:var(--c-error)">Error al cargar los pasos</div>';
+  }
+}
+
+window.abrirNuevaSubelab = function() {
+  if (!puedeGestionarRecetas()) { toast('No tenés permiso', 'error'); return; }
+  const t = RECETA_TIPO;
+  RECETA_EDITANDO = null;
+  RECETA_COMP_EDIT = []; RECETA_COMP_VIEJOS = [];
+  MENU_PASOS_EDIT = []; MENU_PASOS_VIEJOS = [];
+  document.getElementById('subelabTitulo').textContent = t === 'menu' ? 'Nuevo menú' : (t === 'plato' ? 'Nuevo plato' : 'Nueva sub-elaboración');
+  document.getElementById('subelabNombre').value = '';
+  document.getElementById('subelabLocal').innerHTML = opcionesLocalReceta('');
+  document.getElementById('subelabRendimiento').value = t === 'plato' ? '1' : '';
+  document.getElementById('subelabUnidad').innerHTML = opcionesUnidad(t === 'plato' ? 'porción' : 'kg');
+  document.getElementById('subelabProcedimiento').value = '';
+  document.getElementById('platoCategoria').value = '';
+  document.getElementById('platoPrecio').value = '';
+  document.getElementById('subelabError').textContent = '';
+  configurarCamposModal();
+  prepararPickerComponente();
+  renderComponentesEdit();
+  poblarPlatosPicker();
+  renderPasosEdit();
+  document.getElementById('modalSubelab').classList.add('show');
+};
+
+window.abrirEditarSubelab = async function(id) {
+  if (!puedeGestionarRecetas()) { toast('No tenés permiso', 'error'); return; }
+  const r = RECETAS_DB.find(x => x.id === id);
+  if (!r) return;
+  RECETA_EDITANDO = id;
+  RECETA_COMP_EDIT = [];
+  MENU_PASOS_EDIT = []; MENU_PASOS_VIEJOS = [];
+  const t = RECETA_TIPO;
+  document.getElementById('subelabTitulo').textContent = t === 'menu' ? 'Editar menú' : (t === 'plato' ? 'Editar plato' : 'Editar sub-elaboración');
+  document.getElementById('subelabNombre').value = r.nombre || '';
+  document.getElementById('subelabLocal').innerHTML = opcionesLocalReceta(r.local || '');
+  document.getElementById('subelabRendimiento').value = r.rendimiento || '';
+  document.getElementById('subelabUnidad').innerHTML = opcionesUnidad(r.unidad_rendimiento || 'kg');
+  document.getElementById('subelabProcedimiento').value = r.procedimiento || '';
+  document.getElementById('platoCategoria').value = r.categoria || '';
+  setMoneyVal('platoPrecio', r.precio_venta || '');
+  document.getElementById('subelabError').textContent = '';
+  configurarCamposModal();
+  prepararPickerComponente();
+  poblarPlatosPicker();
+  document.getElementById('modalSubelab').classList.add('show');
+  if (t === 'menu') { cargarPasosEnEditor(id); } else { cargarComponentesEnEditor(id); }
+};
+
+// Carga (o recarga) los componentes de una receta dentro del editor abierto
+async function cargarComponentesEnEditor(id) {
+  const cont = document.getElementById('componentesLista');
+  if (cont) cont.innerHTML = '<div class="loading">Cargando componentes...</div>';
+  try {
+    const comps = await api('receta_componentes?receta_id=eq.' + id + '&select=*') || [];
+    RECETA_COMP_VIEJOS = comps.map(c => c.id);
+    RECETA_COMP_EDIT = comps.map(c => {
+      if (c.tipo_componente === 'ingrediente') {
+        const ins = RECETAS_INSUMOS_VAL.find(x => x.id === c.ingrediente_id);
+        return { tipo: 'ingrediente', refId: c.ingrediente_id, nombre: ins ? ins.nombre : ('Insumo #' + c.ingrediente_id), cantidad: parseFloat(c.cantidad) || 0, unidad: c.unidad || '' };
+      }
+      const sub = RECETAS_ELAB_PICKER.find(x => x.id === c.sub_receta_id);
+      return { tipo: 'receta', refId: c.sub_receta_id, nombre: sub ? sub.nombre : ('Sub-elab #' + c.sub_receta_id), cantidad: parseFloat(c.cantidad) || 0, unidad: c.unidad || '' };
+    });
+    renderComponentesEdit();
+  } catch (e) {
+    if (cont) cont.innerHTML = '<div class="cierre-hint" style="color:var(--c-error)">Error al cargar componentes</div>';
+  }
+}
+
+window.closeSubelab = function() {
+  document.getElementById('modalSubelab').classList.remove('show');
+};
+
+function prepararPickerComponente() {
+  const tipoSel = document.getElementById('compTipo');
+  if (tipoSel) tipoSel.value = 'ingrediente';
+  poblarItemsComponente();
+  const cant = document.getElementById('compCantidad'); if (cant) cant.value = '';
+}
+
+// Lista global de items disponibles para el picker de componentes
+let REC_ITEMS_LISTA = [];
+
+window.poblarItemsComponente = function() {
+  const tipo = document.getElementById('compTipo').value;
+  const searchEl = document.getElementById('compItemSearch');
+  const hiddenEl = document.getElementById('compItem');
+  const opts = document.getElementById('compItemOpts');
+
+  if (tipo === 'ingrediente') {
+    REC_ITEMS_LISTA = RECETAS_INSUMOS_VAL.map(i => ({ id: i.id, nombre: i.nombre, unidad: i.unidad || '' }));
+    if (searchEl) searchEl.placeholder = 'Buscá un insumo...';
+  } else {
+    const localReceta = (document.getElementById('subelabLocal') || {}).value || '';
+    REC_ITEMS_LISTA = RECETAS_ELAB_PICKER
+      .filter(r => String(r.id) !== String(RECETA_EDITANDO))
+      .filter(r => !localReceta || !r.local || r.local === localReceta)
+      .map(r => ({ id: r.id, nombre: r.nombre, unidad: r.unidad_rendimiento || '' }));
+    if (searchEl) searchEl.placeholder = 'Buscá una sub-elaboración...';
+  }
+  if (hiddenEl) hiddenEl.value = '';
+  if (searchEl) searchEl.value = '';
+  if (opts) opts.style.display = 'none';
+};
+
+function recCerrarDropdown() {
+  const opts = document.getElementById('compItemOpts');
+  if (opts) opts.style.display = 'none';
+}
+
+// Cerrar dropdown al tocar/hacer click fuera del buscador de componentes
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('compItemWrap');
+  if (wrap && !wrap.contains(e.target)) recCerrarDropdown();
+});
+document.addEventListener('touchstart', function(e) {
+  const wrap = document.getElementById('compItemWrap');
+  if (wrap && !wrap.contains(e.target)) recCerrarDropdown();
+}, { passive: true });
+
+window.recFiltrarItems = function(input) {
+  const q = (input.value || '').toLowerCase().trim();
+  const opts = document.getElementById('compItemOpts');
+  if (!opts) return;
+  const filtrados = q
+    ? REC_ITEMS_LISTA.filter(i => i.nombre.toLowerCase().includes(q))
+    : REC_ITEMS_LISTA.slice(0, 40);
+  if (!filtrados.length) {
+    opts.innerHTML = '<div class="ped-ins-no-result">Sin resultados</div>';
+  } else {
+    // Usar data-id para evitar conflictos de comillas en onclick
+    opts.innerHTML = filtrados.map(function(i) {
+      return '<div class="ped-ins-opt" data-rec-id="' + esc(String(i.id)) + '" onclick="recSeleccionarItemById(this)">' + esc(i.nombre) + '</div>';
+    }).join('');
+  }
+  opts.style.display = 'block';
+};
+
+window.recOcultarItems = function() {
+  // Timeout largo para que en mobile el onclick de la opción se ejecute antes de cerrar
+  setTimeout(recCerrarDropdown, 500);
+};
+
+window.recSeleccionarItemById = function(el) {
+  const id = el.dataset.recId;
+  const item = REC_ITEMS_LISTA.find(function(i) { return String(i.id) === String(id); });
+  if (!item) return;
+  recSeleccionarItem(item.id, item.nombre, item.unidad);
+};
+
+window.recSeleccionarItem = function(id, nombre, unidad) {
+  const hiddenEl = document.getElementById('compItem');
+  const searchEl = document.getElementById('compItemSearch');
+  const uSel = document.getElementById('compUnidad');
+  if (hiddenEl) hiddenEl.value = id;
+  if (searchEl) searchEl.value = nombre;
+  if (unidad && uSel) uSel.value = unidad;
+  recCerrarDropdown();
+};
+
+window.agregarComponente = function() {
+  const tipo = document.getElementById('compTipo').value;
+  const hiddenEl = document.getElementById('compItem');
+  const searchEl = document.getElementById('compItemSearch');
+  const refIdRaw = hiddenEl ? hiddenEl.value : '';
+  const refId = parseInt(refIdRaw, 10);
+  const cantidad = parseFloat(document.getElementById('compCantidad').value) || 0;
+  const unidad = document.getElementById('compUnidad').value;
+  if (!refId) { toast('Elegí un insumo o sub-elaboración', 'error'); return; }
+  if (cantidad <= 0) { toast('Poné una cantidad', 'error'); return; }
+  // Buscar nombre en la lista global
+  const item = REC_ITEMS_LISTA.find(i => String(i.id) === String(refId));
+  const nombre = item ? item.nombre : (searchEl ? searchEl.value : ('Item #' + refId));
+  RECETA_COMP_EDIT.push({ tipo: tipo, refId: refId, nombre: nombre, cantidad: cantidad, unidad: unidad });
+  if (hiddenEl) hiddenEl.value = '';
+  if (searchEl) searchEl.value = '';
+  document.getElementById('compCantidad').value = '';
+  renderComponentesEdit();
+};
+
+window.quitarComponente = function(idx) {
+  RECETA_COMP_EDIT.splice(idx, 1);
+  renderComponentesEdit();
+};
+
+// Conversión de unidades para estimar costos (peso y volumen)
+function convertirCantidad(cant, fromU, toU) {
+  if (!fromU || !toU) return null;
+  const norm = function(u) { return String(u).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+  const f = norm(fromU), t = norm(toU);
+  if (f === t) return cant;
+  const peso = { kg: 1000, kilo: 1000, kilos: 1000, kilogramo: 1000, kilogramos: 1000, g: 1, gr: 1, grs: 1, gramo: 1, gramos: 1 };
+  const vol = { l: 1000, lt: 1000, lts: 1000, litro: 1000, litros: 1000, ml: 1, cc: 1 };
+  const uni = { u: 1, un: 1, uni: 1, unid: 1, unidad: 1, unidades: 1 };
+  const porc = { porcion: 1, porciones: 1, porc: 1 };
+  if (peso[f] != null && peso[t] != null) return cant * peso[f] / peso[t];
+  if (vol[f] != null && vol[t] != null) return cant * vol[f] / vol[t];
+  if (uni[f] != null && uni[t] != null) return cant * uni[f] / uni[t];
+  if (porc[f] != null && porc[t] != null) return cant * porc[f] / porc[t];
+  return null; // unidades no convertibles entre sí (ej: unidad <-> kg)
+}
+
+// Estima el costo de un componente: { unitCost, unidadBase, usado(null si no convertible) }
+function costoComponente(c) {
+  let unitCost = 0, unidadBase = '';
+  if (c.tipo === 'ingrediente') {
+    const ins = RECETAS_INSUMOS_VAL.find(x => x.id === c.refId);
+    if (!ins) return null;
+    unitCost = costoUnitarioInsumo(ins);
+    unidadBase = ins.unidad || '';
+  } else {
+    const sub = RECETAS_ELAB_PICKER.find(x => x.id === c.refId);
+    if (!sub) return null;
+    const rend = parseFloat(sub.rendimiento) || 0;
+    if (rend <= 0) return null;
+    unitCost = (RECETAS_COSTO_CALC[c.refId] || 0) / rend;
+    unidadBase = sub.unidad_rendimiento || '';
+  }
+  const conv = convertirCantidad(parseFloat(c.cantidad) || 0, c.unidad, unidadBase);
+  return { unitCost: unitCost, unidadBase: unidadBase, usado: conv != null ? conv * unitCost : null };
+}
+
+function renderComponentesEdit() {
+  const cont = document.getElementById('componentesLista');
+  if (!cont) return;
+  if (!RECETA_COMP_EDIT.length) {
+    cont.innerHTML = '<div class="cierre-hint">Todavía no agregaste componentes.</div>';
+    return;
+  }
+  let total = 0, hayDuda = false;
+  const filas = RECETA_COMP_EDIT.map((c, idx) => {
+    const cc = costoComponente(c);
+    let costoLinea = '';
+    if (cc) {
+      const unit = '$' + formatNumber(Math.round(cc.unitCost)) + '/' + esc(cc.unidadBase);
+      if (cc.usado != null) {
+        total += cc.usado;
+        costoLinea = '<span class="comp-costo">' + unit + ' · usa <strong>$' + formatNumber(Math.round(cc.usado)) + '</strong></span>';
+      } else {
+        hayDuda = true;
+        costoLinea = '<span class="comp-costo">' + unit + ' · <span class="comp-duda">revisar unidad</span></span>';
+      }
+    }
+    return '<div class="comp-row">' +
+      '<div class="comp-info">' +
+        '<span class="comp-nombre">' + esc(c.nombre) + (c.tipo === 'receta' ? ' <span class="comp-tag">sub-elab</span>' : '') + '</span>' +
+        '<span class="comp-cant">' + fmtCant(c.cantidad) + ' ' + esc(c.unidad) + '</span>' +
+        costoLinea +
+      '</div>' +
+      '<button type="button" class="comp-del" onclick="quitarComponente(' + idx + ')" aria-label="Quitar"><i class="ti ti-trash"></i></button>' +
+    '</div>';
+  }).join('');
+  const totalLinea = '<div class="comp-total">Costo estimado: <strong>$' + formatNumber(Math.round(total)) + '</strong>' +
+    (hayDuda ? ' <span class="comp-duda">(faltan unidades por convertir)</span>' : '') +
+    '<div class="comp-total-hint">Se calcula a partir de los componentes, convirtiendo unidades automáticamente.</div></div>';
+  cont.innerHTML = filas + totalLinea;
+}
+
+window.guardarSubelab = async function() {
+  const err = document.getElementById('subelabError'); err.textContent = '';
+  const esMenu = RECETA_TIPO === 'menu';
+  // Auto-agregar lo que quedó en el selector sin tocar "+"
+  if (esMenu) {
+    const pp = document.getElementById('pasoPlato');
+    if (pp && pp.value) window.agregarPaso();
+  } else {
+    const pendItem = document.getElementById('compItem');
+    const pendCant = parseFloat((document.getElementById('compCantidad') || {}).value) || 0;
+    if (pendItem && pendItem.value && pendCant > 0) window.agregarComponente();
+  }
+  const nombre = document.getElementById('subelabNombre').value.trim();
+  const local = document.getElementById('subelabLocal').value;
+  const procedimiento = document.getElementById('subelabProcedimiento').value.trim() || null;
+
+  if (!nombre) { err.textContent = 'Poné un nombre.'; return; }
+  if (!local) { err.textContent = 'Elegí un local.'; return; }
+  if (esMenu) {
+    if (!MENU_PASOS_EDIT.length) { err.textContent = 'Agregá al menos un paso (plato).'; return; }
+  } else {
+    const rendChk = parseFloat(document.getElementById('subelabRendimiento').value) || 0;
+    if (rendChk <= 0) { err.textContent = 'El rendimiento tiene que ser mayor a 0.'; return; }
+    if (!RECETA_COMP_EDIT.length) { err.textContent = 'Agregá al menos un componente.'; return; }
+  }
+
+  const btn = document.getElementById('btnGuardarSubelab');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  const ahora = new Date().toISOString();
+  const receta = {
+    nombre: nombre, tipo: RECETA_TIPO, local: local,
+    rendimiento: esMenu ? 1 : (parseFloat(document.getElementById('subelabRendimiento').value) || 0),
+    unidad_rendimiento: esMenu ? 'menú' : document.getElementById('subelabUnidad').value,
+    procedimiento: procedimiento, activo: true,
+    actualizado_en: ahora, actualizado_por: currentUser.id
+  };
+  if (RECETA_TIPO === 'plato') {
+    receta.categoria = document.getElementById('platoCategoria').value || null;
+  }
+  if (RECETA_TIPO === 'plato' || esMenu) {
+    receta.precio_venta = parseMiles(document.getElementById('platoPrecio').value) || 0;
+  }
+  if (!RECETA_EDITANDO) { receta.creado_por = currentUser.id; receta.creado_en = ahora; }
+
+  try {
+    const esEdicion = !!RECETA_EDITANDO;
+    let recetaId;
+    if (esEdicion) {
+      await api('recetas?id=eq.' + RECETA_EDITANDO, { method: 'PATCH', body: JSON.stringify(receta) });
+      recetaId = RECETA_EDITANDO;
+    } else {
+      const res = await api('recetas', { method: 'POST', body: JSON.stringify(receta) });
+      recetaId = (Array.isArray(res) ? res[0] : res).id;
+    }
+    if (esMenu) {
+      // Pasos del menú: insertar nuevos primero, borrar viejos después
+      const pasos = MENU_PASOS_EDIT.map((p, i) => ({
+        menu_id: recetaId, receta_id: p.receta_id, orden: i + 1,
+        nombre_paso: p.nombre_paso || null, opcional: !!p.opcional
+      }));
+      await api('menu_pasos', { method: 'POST', body: JSON.stringify(pasos) });
+      if (esEdicion && MENU_PASOS_VIEJOS.length) {
+        await api('menu_pasos?id=in.(' + MENU_PASOS_VIEJOS.join(',') + ')', { method: 'DELETE' });
+      }
+    } else {
+      // Componentes: insertar nuevos primero, borrar viejos después
+      const comps = RECETA_COMP_EDIT.map(c => ({
+        receta_id: recetaId,
+        tipo_componente: c.tipo,
+        ingrediente_id: c.tipo === 'ingrediente' ? c.refId : null,
+        sub_receta_id: c.tipo === 'receta' ? c.refId : null,
+        cantidad: c.cantidad,
+        unidad: c.unidad
+      }));
+      await api('receta_componentes', { method: 'POST', body: JSON.stringify(comps) });
+      if (esEdicion && RECETA_COMP_VIEJOS.length) {
+        await api('receta_componentes?id=in.(' + RECETA_COMP_VIEJOS.join(',') + ')', { method: 'DELETE' });
+      }
+    }
+    // Quedarse en el editor mostrando lo guardado (se recarga desde la base)
+    RECETA_EDITANDO = recetaId;
+    document.getElementById('subelabTitulo').textContent =
+      esMenu ? 'Editar menú' : (RECETA_TIPO === 'plato' ? 'Editar plato' : 'Editar sub-elaboración');
+    const lbl = esMenu ? 'Menú' : (RECETA_TIPO === 'plato' ? 'Plato' : 'Sub-elaboración');
+    const gen = (esMenu || RECETA_TIPO === 'plato') ? 'o' : 'a';
+    toast('✓ ' + lbl + ' ' + (esEdicion ? 'actualizad' : 'cread') + gen, 'success');
+    if (esMenu) { await cargarPasosEnEditor(recetaId); } else { await cargarComponentesEnEditor(recetaId); }
+    COSTEO_CARGADO = false;
+    cargarRecetas();
+  } catch (e) {
+    console.error('guardarSubelab error:', e);
+    err.textContent = 'Error al guardar: ' + (e && e.message ? e.message.slice(0, 180) : e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+};
+
+// Listeners de filtros de recetas
+(function initRecetaFiltros() {
+  const s = document.getElementById('recetaSearch');
+  if (s) s.addEventListener('input', renderRecetas);
+  const fl = document.getElementById('recetaFiltroLocal');
+  if (fl) fl.addEventListener('change', renderRecetas);
+})();
+
 function nuevoCierrePlaceholder() {
   toast('Carga de cierres - próximamente (Fase 2)', 'warning');
 }
@@ -1548,7 +3049,7 @@ async function openConfigPropinas() {
       const data = await api('propinas_config?id=eq.1');
       PROP_CONFIG = (data && data[0]) ? data[0] : null;
     } catch (e) {
-      toast('Error al cargar configuración', 'error');
+      toast('Error al cargar configuración: ' + ((e && e.message) || e), 'error');
       return;
     }
   }
@@ -1614,7 +3115,7 @@ async function guardarConfigPropinas() {
     toast('Configuración actualizada');
     closeConfigPropinas();
   } catch (e) {
-    toast('Error al guardar', 'error');
+    toast('Error al guardar: ' + ((e && e.message) || e), 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Guardar configuración';
@@ -1671,6 +3172,15 @@ const ADMIN_SECTIONS = [
     desc: 'Catálogo de insumos y proveedores',
     activa: true,
     action: () => openAdminInsumos()
+  },
+  {
+    id: 'plantillas',
+    icon: 'ti-template',
+    color: '#7F77DD',
+    title: 'Plantillas de Rosters',
+    desc: 'Horarios estándar para armar la semana',
+    activa: true,
+    action: () => openPlantillasRosters()
   },
   {
     id: 'historial',
@@ -1740,10 +3250,12 @@ let RESET_USER_ID = null;
 // Lista unificada: empleados activos + usuarios sin ficha (ej: matfraga)
 // ============================================
 const AZUCA26_HASH = 'c6a7c00511ff7ca91719d38debce681a27ee1798f905a96801a44c3e75003cbe';
-const PERFIL_LABELS = { master: 'Master', admin: 'Admin', editor: 'Editor', usuario: 'Usuario' };
+const PERFIL_LABELS = { master: 'Master', admin: 'Admin', editor: 'Editor', usuario: 'Usuario', auditor: 'Auditor' };
 
 let PERSONAS_CACHE = [];
 let PERFIL_EDIT_USERID = null;
+let FICHA_EDIT_KEY = null;
+let FICHA_VISTA_KEY = null;
 
 // Quita tildes y pasa a minúsculas para buscar con tolerancia
 function normalizar(s) {
@@ -1785,7 +3297,7 @@ async function cargarUsuarios() {
 
 async function cargarEmpleados() {
   try {
-    ADMIN_EMPLEADOS_CACHE = await api('empleados?activo=eq.true&select=id,nombre,apellido,nombre_p,sector,categoria,local,telefono,fecha_nac,es_multilocal,activo&order=apellido.asc') || [];
+    ADMIN_EMPLEADOS_CACHE = await api('empleados?activo=eq.true&select=id,nombre,apellido,nombre_p,sector,categoria,local,telefono,fecha_nac,es_multilocal,activo,documento,email,alias,talle_remera,talle_pantalon,talle_calzado&order=apellido.asc') || [];
   } catch (e) {
     console.warn('Error al cargar empleados:', e);
     ADMIN_EMPLEADOS_CACHE = [];
@@ -1812,6 +3324,12 @@ function armarPersona(e, u) {
     categoria: e ? (e.categoria || '') : '',
     telefono: e ? (e.telefono || '') : '',
     fechaNac: e ? (e.fecha_nac || '') : '',
+    documento: e ? (e.documento || '') : '',
+    email: e ? (e.email || '') : '',
+    alias: e ? (e.alias || '') : '',
+    talleRemera: e ? (e.talle_remera || '') : '',
+    tallePantalon: e ? (e.talle_pantalon || '') : '',
+    talleCalzado: e ? (e.talle_calzado || '') : '',
     esMultilocal: e ? !!e.es_multilocal : false,
     tieneAcceso: !!u,
     accesoActivo: u ? !!u.activo : false,
@@ -1921,6 +3439,11 @@ function renderPersonal() {
       } else if (p.empleado) {
         acciones += '<button class="btn-ghost pc-btn" onclick="crearAccesoEmpleado(' + p.empleado.id + ')"><i class="ti ti-user-plus"></i>Crear acceso</button>';
       }
+      if (p.empleado) {
+        acciones += '<button class="btn-ghost pc-btn pc-btn-danger" onclick="eliminarPersona(' + p.empleado.id + ', ' + (p.user ? p.user.id : 'null') + ')"><i class="ti ti-trash"></i>Eliminar</button>';
+      } else if (p.user) {
+        acciones += '<button class="btn-ghost pc-btn pc-btn-danger" onclick="eliminarAccesoHuerfano(' + p.user.id + ')"><i class="ti ti-trash"></i>Eliminar acceso</button>';
+      }
     }
 
     return '' +
@@ -1949,19 +3472,272 @@ window.abrirFicha = function(key) {
   document.getElementById('fichaBody').innerHTML =
     fila('Apellido', p.apellido) +
     fila('Nombre', p.pila) +
+    fila('Documento', p.documento) +
     fila('Usuario', p.usuario ? '@' + p.usuario : '') +
     fila('Perfil', p.perfilLabel) +
     fila('Local', p.local ? (LOCAL_LABELS[p.local] || p.local) : '') +
     fila('Sector', p.sector) +
     fila('Categoría', p.categoria) +
     fila('Teléfono', p.telefono) +
+    fila('Email', p.email) +
+    fila('Alias (propinas)', p.alias) +
     fila('Fecha de nacimiento', formatearFecha(p.fechaNac)) +
+    fila('Talle remera', p.talleRemera) +
+    fila('Talle pantalón', p.tallePantalon) +
+    fila('Talle calzado', p.talleCalzado) +
     fila('Multilocal', p.esMultilocal ? 'Sí' : 'No') +
     fila('Estado de acceso', estado);
+  const btnEd = document.getElementById('fichaEditarBtn');
+  if (btnEd) {
+    const puedeEditar = isMaster() || isAdmin();
+    if (puedeEditar && p.empleado) {
+      // Tiene ficha de empleado → editar ficha completa
+      btnEd.style.display = '';
+      btnEd.textContent = 'Editar';
+      btnEd.onclick = function() { window.editarDesdeFicha(); };
+    } else if (puedeEditar && p.user && !p.empleado) {
+      // Solo tiene usuario (sin ficha) → crear ficha con local/multilocal
+      btnEd.style.display = '';
+      btnEd.textContent = 'Crear ficha';
+      btnEd.onclick = function() { closeFichaModal(); crearFichaParaUser(p.user.id); };
+    } else {
+      btnEd.style.display = 'none';
+    }
+  }
+  FICHA_VISTA_KEY = key;
   document.getElementById('modalFicha').classList.add('show');
 };
 window.closeFichaModal = function() {
   document.getElementById('modalFicha').classList.remove('show');
+};
+
+// ---- Editar ficha (Master + Admin): datos base + locales asignados ----
+window.editarDesdeFicha = function() {
+  if (!FICHA_VISTA_KEY) return;
+  closeFichaModal();
+  abrirEditarFicha(FICHA_VISTA_KEY);
+};
+function efRecomputarMultilocal() {
+  const grid = document.getElementById('efLocalesGrid');
+  const cb = document.getElementById('efMultilocal');
+  if (!grid || !cb) return;
+  const slugs = Array.from(grid.querySelectorAll('.local-check.activo')).map(el => el.dataset.local);
+  cb.checked = slugs.length >= 2 || slugs.indexOf('TRANSVERSAL') !== -1;
+}
+// ---- Crear ficha de empleado para un usuario sin empleado ----
+let CREAR_FICHA_USER_ID = null;
+window.crearFichaParaUser = function(userId) {
+  if (!isMaster() && !isAdmin()) return;
+  const u = (ADMIN_USUARIOS_CACHE || []).find(x => x.id === userId);
+  if (!u) return;
+  CREAR_FICHA_USER_ID = userId;
+  FICHA_EDIT_KEY = null; // indica modo creación
+
+  // Pre-llenar con nombre del usuario
+  const partes = (u.nombre || '').trim().split(/\s+/);
+  document.getElementById('efPersonaNombre').textContent = u.nombre || u.usuario || '';
+  document.getElementById('efNombre').value = partes.slice(0, partes.length > 1 ? -1 : 1).join(' ');
+  document.getElementById('efApellido').value = partes.length > 1 ? partes[partes.length - 1] : '';
+  document.getElementById('efSector').value = '';
+  document.getElementById('efCategoria').value = '';
+  document.getElementById('efMultilocal').checked = false;
+  document.getElementById('efMultilocal').disabled = false;
+
+  const todos = getLocalesActivos();
+  document.getElementById('efLocal').innerHTML =
+    '<option value="">— Sin local —</option>' +
+    todos.map(loc => '<option value="' + esc(loc) + '">' + esc(LOCAL_LABELS[loc] || loc) + '</option>').join('');
+
+  const setData = (id, vals) => {
+    const dl = document.getElementById(id);
+    if (dl) dl.innerHTML = Array.from(new Set(vals.filter(Boolean))).sort()
+      .map(v => '<option value="' + esc(v) + '"></option>').join('');
+  };
+  setData('efSectorList', (ADMIN_EMPLEADOS_CACHE || []).map(e => e.sector));
+  setData('efCategoriaList', (ADMIN_EMPLEADOS_CACHE || []).map(e => e.categoria));
+
+  const sec = document.getElementById('efLocalesSection');
+  sec.style.display = '';
+  const asignados = u.locales_asignados || [];
+  document.getElementById('efLocalesGrid').innerHTML = todos.map(loc => {
+    const on = asignados.indexOf(loc) !== -1;
+    return '<label class="local-check' + (on ? ' activo' : '') + '" data-local="' + esc(loc) + '">' +
+           '<input type="checkbox" ' + (on ? 'checked' : '') + '>' + esc(LOCAL_LABELS[loc] || loc) + '</label>';
+  }).join('');
+  document.querySelectorAll('#efLocalesGrid .local-check').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      el.classList.toggle('activo');
+      el.querySelector('input').checked = el.classList.contains('activo');
+      efRecomputarMultilocal();
+    });
+  });
+  efRecomputarMultilocal();
+
+  document.getElementById('efError').textContent = '';
+  document.getElementById('modalEditarFicha').classList.add('show');
+};
+
+window.abrirEditarFicha = function(key) {
+  if (!isMaster() && !isAdmin()) return;
+  const p = PERSONAS_CACHE.find(x => x.key === key);
+  if (!p || !p.empleado) { showAlert('Esta persona no tiene ficha de empleado para editar.'); return; }
+  FICHA_EDIT_KEY = key;
+  document.getElementById('efPersonaNombre').textContent = p.nombreCompleto;
+  document.getElementById('efNombre').value = p.pila || '';
+  document.getElementById('efApellido').value = p.apellido || '';
+  document.getElementById('efSector').value = p.sector || '';
+  document.getElementById('efCategoria').value = p.categoria || '';
+  document.getElementById('efMultilocal').checked = !!p.esMultilocal;
+
+  // Local principal (incluye el actual aunque esté inactivo)
+  const todos = getLocalesActivos().slice();
+  if (p.local && todos.indexOf(p.local) === -1) todos.unshift(p.local);
+  document.getElementById('efLocal').innerHTML =
+    '<option value="">— Sin local —</option>' +
+    todos.map(loc => '<option value="' + esc(loc) + '"' + (loc === p.local ? ' selected' : '') + '>' + esc(LOCAL_LABELS[loc] || loc) + '</option>').join('');
+
+  // Datalists de sector/categoría con valores existentes
+  const setData = (id, vals) => {
+    const dl = document.getElementById(id);
+    if (dl) dl.innerHTML = Array.from(new Set(vals.filter(Boolean))).sort()
+      .map(v => '<option value="' + esc(v) + '"></option>').join('');
+  };
+  setData('efSectorList', (ADMIN_EMPLEADOS_CACHE || []).map(e => e.sector));
+  setData('efCategoriaList', (ADMIN_EMPLEADOS_CACHE || []).map(e => e.categoria));
+
+  // Locales asignados (solo si tiene cuenta de acceso)
+  const sec = document.getElementById('efLocalesSection');
+  if (p.user) {
+    sec.style.display = '';
+    const asignados = p.user.locales_asignados || [];
+    document.getElementById('efLocalesGrid').innerHTML = getLocalesActivos().map(loc => {
+      const on = asignados.indexOf(loc) !== -1;
+      return '<label class="local-check' + (on ? ' activo' : '') + '" data-local="' + esc(loc) + '">' +
+             '<input type="checkbox" ' + (on ? 'checked' : '') + '>' + esc(LOCAL_LABELS[loc] || loc) + '</label>';
+    }).join('');
+    document.querySelectorAll('#efLocalesGrid .local-check').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        el.classList.toggle('activo');
+        el.querySelector('input').checked = el.classList.contains('activo');
+        efRecomputarMultilocal();
+      });
+    });
+    efRecomputarMultilocal();
+    document.getElementById('efMultilocal').disabled = true;
+  } else {
+    sec.style.display = 'none';
+    document.getElementById('efLocalesGrid').innerHTML = '';
+    document.getElementById('efMultilocal').disabled = false;
+  }
+
+  document.getElementById('efError').textContent = '';
+  document.getElementById('modalEditarFicha').classList.add('show');
+};
+window.closeEditarFichaModal = function() {
+  document.getElementById('modalEditarFicha').classList.remove('show');
+};
+window.guardarEditarFicha = async function() {
+  const err = document.getElementById('efError');
+  err.textContent = '';
+
+  // Modo CREAR ficha para usuario sin empleado
+  if (FICHA_EDIT_KEY === null && CREAR_FICHA_USER_ID) {
+    const nombre_p = document.getElementById('efNombre').value.trim();
+    const apellido = document.getElementById('efApellido').value.trim();
+    const sector   = document.getElementById('efSector').value.trim();
+    const categoria= document.getElementById('efCategoria').value.trim();
+    const local    = document.getElementById('efLocal').value || null;
+    const _gridSel = Array.from(document.querySelectorAll('#efLocalesGrid .local-check.activo')).map(el => el.dataset.local);
+    const multilocal = _gridSel.length >= 2 || _gridSel.indexOf('TRANSVERSAL') !== -1;
+    if (!nombre_p && !apellido) { err.textContent = 'Cargá al menos nombre o apellido.'; return; }
+    const btn = document.getElementById('efGuardarBtn');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try {
+      const nuevoEmp = { nombre_p: nombre_p || null, nombre: nombre_p || null, apellido: apellido || null,
+        sector: sector || null, categoria: categoria || null, local, es_multilocal: multilocal, activo: true };
+      const res = await api('empleados', { method: 'POST', body: JSON.stringify(nuevoEmp) });
+      const empId = (Array.isArray(res) ? res[0] : res).id;
+      const locs = _gridSel.length ? _gridSel : null;
+      await api('roster_usuarios?id=eq.' + CREAR_FICHA_USER_ID, { method: 'PATCH',
+        body: JSON.stringify({ empleado_id: empId, locales_asignados: locs,
+          nombre: ((apellido || '') + ' ' + (nombre_p || '')).trim() || null }) });
+      toast('✓ Ficha creada y vinculada', 'success');
+      closeEditarFichaModal();
+      CREAR_FICHA_USER_ID = null;
+      await cargarUsuarios();
+    } catch(e) {
+      err.textContent = 'Error al crear la ficha: ' + ((e && e.message) || e);
+    } finally {
+      const btn2 = document.getElementById('efGuardarBtn');
+      btn2.disabled = false; btn2.textContent = 'Guardar';
+    }
+    return;
+  }
+
+  const p = PERSONAS_CACHE.find(x => x.key === FICHA_EDIT_KEY);
+  if (!p || !p.empleado) { err.textContent = 'No se encontró la ficha.'; return; }
+
+  const nombre_p = document.getElementById('efNombre').value.trim();
+  const apellido = document.getElementById('efApellido').value.trim();
+  const sector = document.getElementById('efSector').value.trim();
+  const categoria = document.getElementById('efCategoria').value.trim();
+  const local = document.getElementById('efLocal').value || null;
+  let multilocal = document.getElementById('efMultilocal').checked;
+  const _gridSel = Array.from(document.querySelectorAll('#efLocalesGrid .local-check.activo')).map(el => el.dataset.local);
+  if (document.getElementById('efLocalesSection').style.display !== 'none') {
+    multilocal = _gridSel.length >= 2 || _gridSel.indexOf('TRANSVERSAL') !== -1;
+  }
+
+  if (!nombre_p && !apellido) { err.textContent = 'Cargá al menos nombre o apellido.'; return; }
+
+  const btn = document.getElementById('efGuardarBtn');
+  btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Guardando...';
+  try {
+    const empPatch = {
+      nombre_p: nombre_p || null,
+      nombre: nombre_p || null,
+      apellido: apellido || null,
+      sector: sector || null,
+      categoria: categoria || null,
+      local: local,
+      es_multilocal: multilocal
+    };
+    await api('empleados?id=eq.' + p.empleado.id, { method: 'PATCH', body: JSON.stringify(empPatch) });
+    const ec = (ADMIN_EMPLEADOS_CACHE || []).find(e => e.id === p.empleado.id);
+    if (ec) Object.assign(ec, empPatch);
+
+    if (p.user) {
+      const checks = document.querySelectorAll('#efLocalesGrid .local-check.activo');
+      const locs = Array.from(checks).map(c => c.dataset.local);
+      const usrPatch = {
+        locales_asignados: locs.length ? locs : null,
+        nombre: ((apellido || '') + ' ' + (nombre_p || '')).trim() || null
+      };
+      await api('roster_usuarios?id=eq.' + p.user.id, { method: 'PATCH', body: JSON.stringify(usrPatch) });
+      const uc = (ADMIN_USUARIOS_CACHE || []).find(u => u.id === p.user.id);
+      if (uc) Object.assign(uc, usrPatch);
+      const ec2 = (EDITORES_CACHE || []).find(u => u.id === p.user.id);
+      if (ec2) Object.assign(ec2, usrPatch);
+      if (currentUser && p.user.id === currentUser.id) {
+        currentUser.locales_asignados = usrPatch.locales_asignados;
+        currentUser.nombre = usrPatch.nombre;
+      }
+    }
+    if (currentEmpleado && currentEmpleado.id === p.empleado.id) {
+      Object.assign(currentEmpleado, empPatch);
+    }
+
+    closeEditarFichaModal();
+    construirPersonas();
+    renderPersonal();
+    toast('✓ Ficha actualizada', 'success');
+  } catch (e) {
+    err.textContent = 'No se pudo guardar: ' + (e.message || e);
+  } finally {
+    btn.disabled = false; btn.textContent = txt;
+  }
 };
 
 // ---- Cambiar perfil (Master + Admin) ----
@@ -2000,7 +3776,7 @@ window.guardarCambioPerfil = async function() {
     toast('✓ Perfil actualizado', 'success');
     await cargarUsuarios();
   } catch (e) {
-    err.textContent = 'Error al actualizar el perfil';
+    err.textContent = 'Error al actualizar el perfil: ' + ((e && e.message) || e);
   } finally {
     btn.disabled = false; btn.textContent = 'Guardar';
   }
@@ -2026,7 +3802,7 @@ window.resetearAzuca26 = async function(userId) {
     });
     toast('✓ Contraseña reseteada a azuca26', 'success');
   } catch (e) {
-    toast('Error al resetear la contraseña', 'error');
+    toast('Error al resetear la contraseña: ' + ((e && e.message) || e), 'error');
   }
 };
 
@@ -2070,13 +3846,19 @@ window.exportarPersonalExcel = function() {
   const filas = items.map(p => ({
     'Apellido': p.apellido,
     'Nombre': p.pila,
+    'Documento': p.documento,
     'Usuario': p.usuario,
     'Perfil': p.perfilLabel,
     'Local': p.local ? (LOCAL_LABELS[p.local] || p.local) : '',
     'Sector': p.sector,
     'Categoría': p.categoria,
     'Teléfono': p.telefono,
+    'Email': p.email,
+    'Alias': p.alias,
     'Fecha nacimiento': p.fechaNac || '',
+    'Talle remera': p.talleRemera,
+    'Talle pantalón': p.tallePantalon,
+    'Talle calzado': p.talleCalzado,
     'Multilocal': p.esMultilocal ? 'Sí' : 'No',
     'Acceso': p.tieneAcceso ? (p.accesoActivo ? 'Activo' : 'Inactivo') : 'Sin acceso'
   }));
@@ -2104,12 +3886,15 @@ window.abrirCrearUsuario = function() {
   document.getElementById('userUsuario').value = '';
   document.getElementById('userPassword').value = '';
   document.getElementById('userPerfil').value = 'usuario';
-  document.getElementById('userEmpleado').innerHTML = '<option value="">Sin vincular (no tiene turnos)</option>' +
+  const _empOptsC = '<option value="">Sin vincular</option>' +
     ADMIN_EMPLEADOS_CACHE.map(e => {
       const lbl = `${e.nombre || ''} ${e.apellido || ''}`.trim() + (e.local ? ' · ' + (LOCAL_LABELS[e.local] || e.local) : '');
       return `<option value="${e.id}">${esc(lbl)}</option>`;
     }).join('');
+  document.getElementById('userEmpleado').innerHTML = _empOptsC;
   document.getElementById('userEmpleado').value = '';
+  document.getElementById('userLocalesField').style.display = 'none';
+  document.getElementById('userEmpleadoField').style.display = '';
   document.getElementById('userPasswordField').style.display = '';
   document.getElementById('userFormError').textContent = '';
 
@@ -2131,12 +3916,15 @@ window.abrirEditarUsuario = function(id) {
   document.getElementById('userPassword').value = '';
   document.getElementById('userPerfil').value = u.perfil || 'usuario';
 
-  document.getElementById('userEmpleado').innerHTML = '<option value="">Sin vincular (no tiene turnos)</option>' +
+  const _empOptsE = '<option value="">Sin vincular</option>' +
     ADMIN_EMPLEADOS_CACHE.map(e => {
       const lbl = `${e.nombre || ''} ${e.apellido || ''}`.trim() + (e.local ? ' · ' + (LOCAL_LABELS[e.local] || e.local) : '');
       return `<option value="${e.id}">${esc(lbl)}</option>`;
     }).join('');
+  document.getElementById('userEmpleado').innerHTML = _empOptsE;
   document.getElementById('userEmpleado').value = u.empleado_id || '';
+  document.getElementById('userLocalesField').style.display = 'none';
+  document.getElementById('userEmpleadoField').style.display = '';
 
   // En edición, ocultar password (se cambia con el botón de reset)
   document.getElementById('userPasswordField').style.display = 'none';
@@ -2333,7 +4121,7 @@ window.toggleActivoUser = async function(id) {
     toast(`✓ Usuario ${u.activo ? 'desactivado' : 'activado'}`, 'success');
     await cargarUsuarios();
   } catch (err) {
-    toast('Error al cambiar estado', 'error');
+    toast('Error al cambiar estado: ' + ((e && e.message) || e), 'error');
   }
 };
 
@@ -2351,7 +4139,10 @@ const PERMISOS_DEF = [
   { key: 'editor_propinas',   label: 'Propinas',      icon: 'ti-cash',           tipo: 'editor' },
   { key: 'editor_biblioteca', label: 'Biblioteca',    icon: 'ti-books',          tipo: 'editor' },
   { key: 'editor_recetas',    label: 'Recetas',       icon: 'ti-chef-hat',       tipo: 'editor' },
-  { key: 'editor_pedidos',    label: 'Pedidos',       icon: 'ti-shopping-cart',  tipo: 'editor' }
+  { key: 'editor_pedidos',    label: 'Pedidos',       icon: 'ti-shopping-cart',  tipo: 'editor' },
+  { key: 'editor_insumos',    label: 'Insumos / Compras', icon: 'ti-package',    tipo: 'editor' },
+  { key: 'editor_stock',      label: 'Stock',         icon: 'ti-clipboard-check', tipo: 'editor' },
+  { key: 'editor_cierres',    label: 'Cierres de caja', icon: 'ti-cash-register', tipo: 'editor' }
 ];
 
 async function openAdminEditores() {
@@ -2461,7 +4252,7 @@ window.togglePermiso = async function(userId, key, labelEl) {
       body: JSON.stringify({ [key]: nuevoValor })
     });
   } catch (err) {
-    toast('Error al guardar permiso', 'error');
+    toast('Error al guardar permiso: ' + ((e && e.message) || e), 'error');
     // Revertir cambio visual
     user[key] = !nuevoValor;
     labelEl.classList.toggle('activo', !nuevoValor);
@@ -2657,7 +4448,7 @@ const BIB_ICONOS_CAT = [
 
 // ¿Puede el usuario administrar la biblioteca?
 function puedeAdminBib() {
-  return isMaster() || isAdmin() || currentUser.editor_biblioteca === true;
+  return isMaster() || isAdmin();
 }
 
 // ¿Puede gestionar categorías y borrar? (solo Admin/Master)
@@ -2685,7 +4476,7 @@ async function openMiBiblioteca() {
   try {
     const [cats, conts] = await Promise.all([
       api('biblioteca_categorias?activo=eq.true&order=orden.asc'),
-      api('biblioteca_contenidos?activo=eq.true&order=creado_en.desc')
+      api('biblioteca_contenidos?activo=neq.false&order=creado_en.desc')
     ]);
     BIB_CATEGORIAS = cats || [];
     BIB_CONTENIDOS = conts || [];
@@ -2696,9 +4487,19 @@ async function openMiBiblioteca() {
 
   // Filtrar contenidos por locales del usuario
   const localesUser = localesUsuarioActual();
+  const esEditor = !!(currentUser && currentUser.editor_biblioteca);
+  const transversalSlug = (() => {
+    const t = LOCALES_DB.find(x => /transversal/i.test(x.nombre || '') || /transversal/i.test(x.slug || ''));
+    return t ? t.slug : null;
+  })();
   const visibles = BIB_CONTENIDOS.filter(c => {
     if (isMaster() || isAdmin()) return true;
-    if (!c.locales || c.locales.length === 0) return false;
+    // contenido sin locales = transversal, visible para todos
+    if (!c.locales || c.locales.length === 0) return true;
+    // contenido marcado como transversal
+    if (transversalSlug && c.locales.includes(transversalSlug)) return true;
+    // Si no es editor de biblioteca, ve el contenido de sus locales también
+    if (!esEditor) return c.locales.some(loc => localesUser.includes(loc));
     return c.locales.some(loc => localesUser.includes(loc));
   });
 
@@ -2714,7 +4515,11 @@ function renderBibChips(visibles) {
     visibles.some(c => c.categoria_id === cat.id)
   );
 
-  let html = `<button class="bib-chip ${BIB_FILTRO_CAT === null ? 'active' : ''}" onclick="filtrarBibCat(null)">Todas</button>`;
+  // Academia chip siempre al inicio
+  let html = `<button class="bib-chip bib-chip-academia" onclick="openAcademia()">
+    <i class="ti ti-school"></i> Academia
+  </button>`;
+  html += `<button class="bib-chip ${BIB_FILTRO_CAT === null ? 'active' : ''}" onclick="filtrarBibCat(null)">Todas</button>`;
   catsConContenido.forEach(cat => {
     html += `<button class="bib-chip ${BIB_FILTRO_CAT === cat.id ? 'active' : ''}" onclick="filtrarBibCat(${cat.id})">
       <i class="ti ${esc(cat.icono || 'ti-folder')}"></i>${esc(cat.nombre)}
@@ -2799,6 +4604,9 @@ async function openAdminBiblioteca() {
   // Tab de categorías solo visible para Admin/Master
   document.getElementById('bibTabCategorias').style.display =
     puedeAdminBibCat() ? 'inline-flex' : 'none';
+  // Tab Academia siempre visible para Admin/Master
+  document.getElementById('bibTabAcademia').style.display =
+    (isMaster() || isAdmin()) ? 'inline-flex' : 'none';
 
   // Subtítulo según rol
   document.getElementById('adminBibSubtitle').textContent =
@@ -2815,12 +4623,12 @@ async function recargarBibAdmin() {
   try {
     const [cats, conts] = await Promise.all([
       api('biblioteca_categorias?activo=eq.true&order=orden.asc'),
-      api('biblioteca_contenidos?activo=eq.true&order=creado_en.desc')
+      api('biblioteca_contenidos?order=creado_en.desc')
     ]);
     BIB_CATEGORIAS = cats || [];
     BIB_CONTENIDOS = conts || [];
   } catch (e) {
-    toast('Error al cargar datos', 'error');
+    toast('Error al cargar datos: ' + ((e && e.message) || e), 'error');
     return;
   }
   renderBibAdminLista();
@@ -2828,21 +4636,27 @@ async function recargarBibAdmin() {
 }
 
 function switchBibTab(tab) {
-  const tabCont = document.getElementById('bibTabContenidos');
-  const tabCat  = document.getElementById('bibTabCategorias');
-  const panCont = document.getElementById('bibPanelContenidos');
-  const panCat  = document.getElementById('bibPanelCategorias');
+  const tabCont  = document.getElementById('bibTabContenidos');
+  const tabCat   = document.getElementById('bibTabCategorias');
+  const tabAcad  = document.getElementById('bibTabAcademia');
+  const panCont  = document.getElementById('bibPanelContenidos');
+  const panCat   = document.getElementById('bibPanelCategorias');
+  const panAcad  = document.getElementById('bibPanelAcademia');
+
+  // Reset all
+  [tabCont, tabCat, tabAcad].forEach(t => t && t.classList.remove('active'));
+  [panCont, panCat, panAcad].forEach(p => p && (p.style.display = 'none'));
 
   if (tab === 'contenidos') {
     tabCont.classList.add('active');
-    tabCat.classList.remove('active');
     panCont.style.display = 'block';
-    panCat.style.display = 'none';
-  } else {
-    tabCont.classList.remove('active');
+  } else if (tab === 'categorias') {
     tabCat.classList.add('active');
-    panCont.style.display = 'none';
     panCat.style.display = 'block';
+  } else if (tab === 'academia') {
+    tabAcad && tabAcad.classList.add('active');
+    panAcad.style.display = 'block';
+    renderAdminPapersList();
   }
 }
 
@@ -2863,23 +4677,31 @@ function renderBibAdminLista() {
     const tipo = BIB_TIPOS.find(t => t.key === c.tipo) || BIB_TIPOS[0];
     const cat = BIB_CATEGORIAS.find(k => k.id === c.categoria_id);
     const locTxt = (!c.locales || c.locales.length === 0)
-      ? 'Sin locales'
+      ? 'Todos los locales'
       : (c.locales.length === getLocalesActivos().length
           ? 'Todos los locales'
           : c.locales.length + ' local' + (c.locales.length > 1 ? 'es' : ''));
 
+    const inactivo = c.activo === false;
     const btnDelete = puedeAdminBibCat()
       ? `<button class="bib-btn-delete" onclick="borrarContenido(${c.id})" title="Borrar"><i class="ti ti-trash"></i></button>`
       : '';
+    const btnActivar = (inactivo && puedeAdminBibCat())
+      ? `<button class="bib-btn-activar" onclick="activarContenido(${c.id})" title="Activar"><i class="ti ti-eye"></i></button>`
+      : '';
+    const badgeInactivo = inactivo
+      ? `<span class="bib-badge-inactivo">Inactivo</span>`
+      : '';
 
     html += `
-      <div class="bib-admin-item">
+      <div class="bib-admin-item${inactivo ? ' bib-admin-item--inactivo' : ''}">
         <div class="bib-admin-item-icon ${tipo.cls}"><i class="ti ${tipo.icon}"></i></div>
         <div class="bib-admin-item-info">
-          <div class="bib-admin-item-titulo">${esc(c.titulo)}</div>
+          <div class="bib-admin-item-titulo">${esc(c.titulo)}${badgeInactivo}</div>
           <div class="bib-admin-item-meta">${esc(cat ? cat.nombre : 'Sin categoría')} · ${locTxt}</div>
         </div>
         <div class="bib-admin-item-actions">
+          ${btnActivar}
           <button class="bib-btn-edit" onclick="openModalContenido(${c.id})" title="Editar"><i class="ti ti-edit"></i></button>
           ${btnDelete}
         </div>
@@ -3011,12 +4833,22 @@ async function guardarContenido() {
   btn.disabled = true;
   btn.textContent = 'Guardando...';
 
+  // Si eligieron el local "TODOS" (transversal), guardar locales=null para que aparezca en todos
+  const transversalSlugGuardar = (() => {
+    const t = LOCALES_DB.find(x => /transversal/i.test(x.nombre || '') || /transversal/i.test(x.slug || ''));
+    return t ? t.slug : null;
+  })();
+  const localesParaGuardar = (transversalSlugGuardar && BIB_LOCALES_SEL.includes(transversalSlugGuardar))
+    ? null
+    : BIB_LOCALES_SEL;
+
   const body = {
     titulo,
     categoria_id,
     tipo: BIB_TIPO_SEL,
     url,
-    locales: BIB_LOCALES_SEL,
+    locales: localesParaGuardar,
+    activo: true,
     actualizado_en: new Date().toISOString()
   };
 
@@ -3040,12 +4872,26 @@ async function guardarContenido() {
     closeModalContenido();
     await recargarBibAdmin();
   } catch (e) {
-    toast('Error al guardar', 'error');
+    toast('Error al guardar: ' + ((e && e.message) || e), 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Guardar';
   }
 }
+
+async function activarContenido(id) {
+  try {
+    await api(`biblioteca_contenidos?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ activo: true })
+    });
+    toast('Contenido activado');
+    await recargarBibAdmin();
+  } catch (e) {
+    toast('Error al activar: ' + ((e && e.message) || e), 'error');
+  }
+}
+window.activarContenido = activarContenido;
 
 async function borrarContenido(id) {
   const c = BIB_CONTENIDOS.find(x => x.id === id);
@@ -3069,7 +4915,7 @@ async function borrarContenido(id) {
     toast('Contenido borrado');
     await recargarBibAdmin();
   } catch (e) {
-    toast('Error al borrar', 'error');
+    toast('Error al borrar: ' + ((e && e.message) || e), 'error');
   }
 }
 
@@ -3139,7 +4985,7 @@ async function guardarCategoria() {
     closeModalCategoria();
     await recargarBibAdmin();
   } catch (e) {
-    toast('Error al guardar', 'error');
+    toast('Error al guardar: ' + ((e && e.message) || e), 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Guardar';
@@ -3179,7 +5025,7 @@ async function borrarCategoria(id) {
     toast('Categoría borrada');
     await recargarBibAdmin();
   } catch (e) {
-    toast('Error al borrar', 'error');
+    toast('Error al borrar: ' + ((e && e.message) || e), 'error');
   }
 }
 
@@ -3323,7 +5169,7 @@ async function guardarLocal() {
     closeModalLocal();
     await recargarLocalesAdmin();
   } catch (e) {
-    toast('Error al guardar', 'error');
+    toast('Error al guardar: ' + ((e && e.message) || e), 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Guardar';
@@ -3355,8 +5201,17 @@ let INSUMOS_BUSCAR_TIMEOUT = null;
 
 // ¿Quién puede gestionar insumos?
 function puedeGestionarInsumos() {
+  return isMaster() || isAdmin() || (currentUser && currentUser.editor_insumos === true);
+}
+function puedeEditarInsumos() {
   return isMaster() || isAdmin();
 }
+
+// Volver desde Insumos: Admin/Master -> panel Administración; editor de Compras -> inicio
+window.volverDeInsumos = function() {
+  if (isMaster() || isAdmin()) openAdministracion();
+  else showDashboard();
+};
 
 async function openAdminInsumos() {
   if (!puedeGestionarInsumos()) {
@@ -3366,6 +5221,13 @@ async function openAdminInsumos() {
   }
 
   showView('vAdminInsumos');
+
+  const _nb = document.getElementById('insumoNuevoBtn');
+  if (_nb) _nb.style.display = puedeEditarInsumos() ? '' : 'none';
+  const _gb = document.getElementById('insumoGearBtn');
+  if (_gb) _gb.style.display = puedeEditarInsumos() ? '' : 'none';
+  const _xb = document.getElementById('insumoExportBtn');
+  if (_xb) _xb.style.display = puedeEditarInsumos() ? '' : 'none';
 
   // Reset filtros si es primera vez
   document.getElementById('insumoBuscar').value = INSUMOS_FILTRO_TEXTO;
@@ -3421,6 +5283,24 @@ async function cargarSubfamiliasUnicas() {
   return cargarOpcionesUnicas();
 }
 
+function actualizarDatalistsInsumos() {
+  const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const subF = norm(INSUMOS_FILTRO_SUBFAMILIA);
+  const provF = norm(INSUMOS_FILTRO_PROVEEDOR);
+  // Proveedores que tienen insumos en la subfamilia elegida
+  const provs = [...new Set(INSUMOS_DB
+    .filter(i => !subF || norm(i.subfamilia).includes(subF))
+    .map(i => i.proveedor).filter(Boolean))].sort();
+  // Subfamilias que tiene el proveedor elegido
+  const subs = [...new Set(INSUMOS_DB
+    .filter(i => !provF || norm(i.proveedor).includes(provF))
+    .map(i => i.subfamilia).filter(Boolean))].sort();
+  const dlProv = document.getElementById('insumoProveedorList');
+  if (dlProv) dlProv.innerHTML = provs.map(p => `<option value="${esc(p)}">`).join('');
+  const dlSub = document.getElementById('insumoSubfamiliaList');
+  if (dlSub) dlSub.innerHTML = subs.map(s => `<option value="${esc(s)}">`).join('');
+}
+
 function insumosFiltrados() {
   const txt = INSUMOS_FILTRO_TEXTO.toLowerCase().trim();
   // Normalizamos para tolerancia a tildes y mayúsculas
@@ -3454,14 +5334,66 @@ function insumosFiltrados() {
   });
 }
 
+// Exportar Insumos a Excel (3 hojas, respeta los filtros activos)
+window.exportarInsumosExcel = function() {
+  const items = insumosFiltrados();
+  if (!items.length) {
+    toast('No hay insumos para exportar con esos filtros', 'error');
+    return;
+  }
+
+  // Hoja 1: Insumos
+  const filasInsumos = items.map(i => ({
+    'Nombre': i.nombre || '',
+    'Formato': i.formato || '',
+    'Unidad': i.unidad || '',
+    'Cantidad por envase': parseFloat(i.cantidad_por_presentacion || 0),
+    'Costo envase': parseFloat(i.costo || 0),
+    'Costo por unidad': Math.round(costoUnitarioInsumo(i) * 100) / 100,
+    'Proveedor': i.proveedor || '',
+    'Subfamilia': i.subfamilia || '',
+    'Código HiOPOS': i.codigo_hiopos || '',
+    'Estado': i.validado ? 'Validado' : 'Pendiente',
+    'Actualizado': i.actualizado_en ? String(i.actualizado_en).substring(0, 10) : ''
+  }));
+
+  // Hoja 2: Subfamilias (conteo dentro de lo filtrado)
+  const subMap = {};
+  items.forEach(i => {
+    const s = i.subfamilia || '(sin subfamilia)';
+    subMap[s] = (subMap[s] || 0) + 1;
+  });
+  const filasSub = Object.keys(subMap).sort((a, b) => a.localeCompare(b, 'es'))
+    .map(s => ({ 'Subfamilia': s, 'Cantidad de insumos': subMap[s] }));
+
+  // Hoja 3: Proveedores (conteo dentro de lo filtrado)
+  const provMap = {};
+  items.forEach(i => {
+    const p = i.proveedor || '(sin proveedor)';
+    provMap[p] = (provMap[p] || 0) + 1;
+  });
+  const filasProv = Object.keys(provMap).sort((a, b) => a.localeCompare(b, 'es'))
+    .map(p => ({ 'Proveedor': p, 'Cantidad de insumos': provMap[p] }));
+
+  exportarAExcel('Insumos_AZUCA_' + hoyStr() + '.xlsx', [
+    { nombre: 'Insumos', filas: filasInsumos },
+    { nombre: 'Subfamilias', filas: filasSub },
+    { nombre: 'Proveedores', filas: filasProv }
+  ]);
+  toast('\u2713 Excel generado (' + items.length + ' insumos)', 'success');
+};
+
 function renderInsumosLista() {
   const cont = document.getElementById('insumosLista');
   const countEl = document.getElementById('insumosCount');
   const filtrados = insumosFiltrados();
 
-  countEl.textContent = filtrados.length === INSUMOS_DB.length
+  const textoCount = filtrados.length === INSUMOS_DB.length
     ? `${INSUMOS_DB.length} insumos`
     : `${filtrados.length} de ${INSUMOS_DB.length} insumos`;
+  countEl.textContent = textoCount;
+  const inlineEl = document.getElementById('insumosCountInline');
+  if (inlineEl) inlineEl.textContent = textoCount;
 
   if (filtrados.length === 0) {
     cont.innerHTML = `
@@ -3511,14 +5443,14 @@ function renderInsumosLista() {
           </div>
           ${i.subfamilia ? `<div class="insumo-meta" style="margin-top:6px"><i class="ti ti-tag" style="font-size:11px;vertical-align:-1px"></i> ${esc(i.subfamilia)}</div>` : ''}
         </div>
-        <div class="insumo-actions">
+        ${puedeEditarInsumos() ? `<div class="insumo-actions">
           <button class="bib-btn-edit" onclick="openModalInsumo(${i.id})" title="Editar">
             <i class="ti ti-edit"></i>
           </button>
           <button class="bib-btn-delete" onclick="borrarInsumo(${i.id})" title="Borrar">
             <i class="ti ti-trash"></i>
           </button>
-        </div>
+        </div>` : ''}
       </div>`;
   });
   cont.innerHTML = html;
@@ -3574,15 +5506,32 @@ function onFiltroInsumo() {
     INSUMOS_FILTRO_SUBFAMILIA = document.getElementById('insumoSubfamilia').value;
     INSUMOS_FILTRO_PROVEEDOR  = document.getElementById('insumoProveedor').value;
     INSUMOS_FILTRO_ESTADO     = document.getElementById('insumoEstado').value;
+    actualizarDatalistsInsumos();
     INSUMOS_PAGE = 0;
     renderInsumosLista();
   }, 200);
 }
 
+// Limpiar todos los filtros y volver a ver todos los insumos
+window.limpiarFiltrosInsumos = function() {
+  INSUMOS_FILTRO_TEXTO = '';
+  INSUMOS_FILTRO_SUBFAMILIA = '';
+  INSUMOS_FILTRO_PROVEEDOR = '';
+  INSUMOS_FILTRO_ESTADO = '';
+  ['insumoBuscar', 'insumoSubfamilia', 'insumoProveedor', 'insumoEstado'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  actualizarDatalistsInsumos();
+  INSUMOS_PAGE = 0;
+  renderInsumosLista();
+};
+
 // ============================================
 // MODAL: CREAR / EDITAR INSUMO
 // ============================================
 function openModalInsumo(id) {
+  if (!puedeEditarInsumos()) { toast('Solo Master/Admin puede editar insumos', 'error'); return; }
   INSUMO_EDITANDO = id;
   const ins = id ? INSUMOS_DB.find(x => x.id === id) : null;
 
@@ -3592,7 +5541,7 @@ function openModalInsumo(id) {
   document.getElementById('insFormato').value = ins ? (ins.formato || '') : '';
   document.getElementById('insUnidad').value = ins ? (ins.unidad || 'kg') : 'kg';
   document.getElementById('insCantidad').value = ins ? (ins.cantidad_por_presentacion || '') : '1';
-  document.getElementById('insCosto').value = ins ? (ins.costo || '') : '';
+  setMoneyVal('insCosto', ins ? ins.costo : '');
   document.getElementById('insProveedor').value = ins ? (ins.proveedor || '') : '';
   document.getElementById('insCodigo').value = ins ? (ins.codigo_hiopos || '') : '';
 
@@ -3635,7 +5584,7 @@ function closeModalInsumo() {
 }
 
 function actualizarCostoUnidad() {
-  const costo = parseFloat(document.getElementById('insCosto').value) || 0;
+  const costo = parseMiles(document.getElementById('insCosto').value) || 0;
   const cant = parseFloat(document.getElementById('insCantidad').value) || 0;
   const unidad = document.getElementById('insUnidad').value || '';
   const box = document.getElementById('insCostoUnidad');
@@ -3647,11 +5596,12 @@ function actualizarCostoUnidad() {
 }
 
 async function guardarInsumo(validar) {
+  if (!puedeEditarInsumos()) { toast('Solo Master/Admin puede editar insumos', 'error'); return; }
   const nombre = document.getElementById('insNombre').value.trim();
   const formato = document.getElementById('insFormato').value.trim();
   const unidad = document.getElementById('insUnidad').value;
   const cantidad = parseFloat(document.getElementById('insCantidad').value);
-  const costo = parseFloat(document.getElementById('insCosto').value);
+  const costo = parseMiles(document.getElementById('insCosto').value);
   const proveedor = document.getElementById('insProveedor').value.trim();
   const codigo = document.getElementById('insCodigo').value.trim();
   const subfamilia = document.getElementById('insSubfamilia').value;
@@ -3706,7 +5656,7 @@ async function guardarInsumo(validar) {
     await cargarSubfamiliasUnicas();
     renderInsumosLista();
   } catch (e) {
-    toast('Error al guardar', 'error');
+    toast('Error al guardar: ' + ((e && e.message) || e), 'error');
     console.error(e);
   } finally {
     btnVal.disabled = false;
@@ -3715,6 +5665,7 @@ async function guardarInsumo(validar) {
 }
 
 async function borrarInsumo(id) {
+  if (!puedeEditarInsumos()) { toast('Solo Master/Admin puede editar insumos', 'error'); return; }
   const ins = INSUMOS_DB.find(x => x.id === id);
   if (!ins) return;
 
@@ -3754,7 +5705,7 @@ async function borrarInsumo(id) {
     await cargarInsumos();
     renderInsumosLista();
   } catch (e) {
-    toast('Error al borrar', 'error');
+    toast('Error al borrar: ' + ((e && e.message) || e), 'error');
   }
 }
 
@@ -3900,7 +5851,7 @@ async function guardarRenombrarSubfam() {
     renderInsumosLista();
     renderSubfamilias();
   } catch (e) {
-    toast('Error al actualizar', 'error');
+    toast('Error al actualizar: ' + ((e && e.message) || e), 'error');
     console.error(e);
   } finally {
     btn.disabled = false;
@@ -3937,7 +5888,7 @@ async function borrarSubfamilia(nombre) {
     renderInsumosLista();
     renderSubfamilias();
   } catch (e) {
-    toast('Error al borrar', 'error');
+    toast('Error al borrar: ' + ((e && e.message) || e), 'error');
   }
 }
 
@@ -4093,7 +6044,7 @@ async function guardarRenombrarProv() {
     renderInsumosLista();
     renderProveedores();
   } catch (e) {
-    toast('Error al actualizar', 'error');
+    toast('Error al actualizar: ' + ((e && e.message) || e), 'error');
     console.error(e);
   } finally {
     btn.disabled = false;
@@ -4130,7 +6081,7 @@ async function borrarProveedor(nombre) {
     renderInsumosLista();
     renderProveedores();
   } catch (e) {
-    toast('Error al borrar', 'error');
+    toast('Error al borrar: ' + ((e && e.message) || e), 'error');
   }
 }
 
@@ -4157,6 +6108,2537 @@ window.openRenombrarProv = openRenombrarProv;
 window.closeRenombrarProv = closeRenombrarProv;
 window.guardarRenombrarProv = guardarRenombrarProv;
 window.borrarProveedor = borrarProveedor;
+
+
+// ============================================
+// GESTIÓN DE ROSTERS (Admin / Master / editor_rosters)
+// ============================================
+function puedeGestionarRosters() {
+  return isMaster() || isAdmin() || (currentUser && currentUser.editor_rosters === true);
+}
+function rostLocalesPermitidos() {
+  const activos = getLocalesActivos();
+  if (isMaster() || isAdmin()) return activos;
+  const mios = (currentUser && currentUser.locales_asignados) || [];
+  return activos.filter(l => mios.indexOf(l) !== -1);
+}
+function rostNombreEmp(e) {
+  const pila = e.nombre_p || e.nombre || '';
+  const ap = e.apellido || '';
+  if (ap && pila) return ap + ', ' + pila;
+  return (ap || pila || 'Sin nombre');
+}
+
+let ROST_LOCAL = null, ROST_LUNES = null, ROST_SEMANA = null;
+let ROST_EMPLEADOS = [], ROST_TURNOS = {}, ROST_EMP_EDIT = null, ROST_PLANTILLAS = [];
+let ROST_SECTOR_FILTRO = '', ROST_ALL_EMP = [], ROST_EMP_ASIG = {};
+
+async function openGestionRosters() {
+  if (!puedeGestionarRosters()) return;
+  showView('vGestionRosters');
+  const locs = rostLocalesPermitidos();
+  const sel = document.getElementById('rostLocal');
+  sel.innerHTML = locs.map(l => '<option value="' + esc(l) + '">' + esc(LOCAL_LABELS[l] || l) + '</option>').join('');
+  if (!locs.length) {
+    document.getElementById('rostWeekLabel').textContent = '—';
+    document.getElementById('rostLista').innerHTML = '<div class="empty-list">No tenés locales asignados para gestionar rosters.</div>';
+    return;
+  }
+  let def = locs[0];
+  if (currentEmpleado && currentEmpleado.local && locs.indexOf(currentEmpleado.local) !== -1) def = currentEmpleado.local;
+  sel.value = def;
+  ROST_LOCAL = def;
+  ROST_LUNES = addDays(getLunes(hoyStr()), 7);  // por defecto la semana siguiente (la que hay que editar)
+  await cargarPlantillasRoster();
+  await cargarEmpleadosRoster();
+  await cargarRosterSemana();
+}
+window.onChangeLocalRoster = function() {
+  ROST_LOCAL = document.getElementById('rostLocal').value;
+  cargarRosterSemana();
+};
+window.cambiarSemanaRoster = function(n) {
+  ROST_LUNES = addDays(ROST_LUNES, n * 7);
+  cargarRosterSemana();
+};
+
+async function cargarPlantillasRoster() {
+  try {
+    ROST_PLANTILLAS = await api('turnos_estandar?activo=eq.true&select=*&order=nombre') || [];
+  } catch (e) {
+    ROST_PLANTILLAS = [];
+    console.warn('No se pudieron cargar plantillas:', e);
+  }
+}
+
+async function cargarEmpleadosRoster() {
+  try {
+    ROST_ALL_EMP = await api('empleados?activo=eq.true&select=*') || [];
+    const users = await api('roster_usuarios?empleado_id=not.is.null&select=empleado_id,locales_asignados') || [];
+    ROST_EMP_ASIG = {};
+    users.forEach(u => { if (u.empleado_id != null) ROST_EMP_ASIG[u.empleado_id] = u.locales_asignados || []; });
+  } catch (e) { console.warn('No se pudieron cargar empleados:', e); ROST_ALL_EMP = ROST_ALL_EMP || []; }
+}
+function poblarSectorRoster() {
+  const sel = document.getElementById('rostSector');
+  if (!sel) return;
+  const sectores = Array.from(new Set(ROST_EMPLEADOS.map(e => e.sector).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'));
+  const prev = ROST_SECTOR_FILTRO;
+  sel.innerHTML = '<option value="">Todos los sectores</option>' + sectores.map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+  if (sectores.indexOf(prev) !== -1) sel.value = prev; else { sel.value = ''; ROST_SECTOR_FILTRO = ''; }
+}
+window.onChangeSectorRoster = function() {
+  ROST_SECTOR_FILTRO = document.getElementById('rostSector').value;
+  renderRosterLista();
+};
+
+async function cargarRosterSemana() {
+  const lista = document.getElementById('rostLista');
+  document.getElementById('rostWeekLabel').textContent = fmtSemana(ROST_LUNES);
+  lista.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    const sem = await api('roster_semanas?local=eq.' + encodeURIComponent(ROST_LOCAL) + '&fecha_lunes=eq.' + ROST_LUNES + '&select=*');
+    ROST_SEMANA = (sem && sem.length) ? sem[0] : null;
+    document.getElementById('rostNota').value = ROST_SEMANA ? (ROST_SEMANA.comentario_general || '') : '';
+
+    ROST_EMPLEADOS = (ROST_ALL_EMP || []).filter(e =>
+      e.local === ROST_LOCAL ||
+      (e.es_multilocal && (ROST_EMP_ASIG[e.id] || []).indexOf(ROST_LOCAL) !== -1)
+    );
+    ROST_EMPLEADOS.sort((a, b) => rostNombreEmp(a).localeCompare(rostNombreEmp(b), 'es'));
+    poblarSectorRoster();
+
+    ROST_TURNOS = {};
+    if (ROST_SEMANA) {
+      const tts = await api('roster_turnos?semana_id=eq.' + ROST_SEMANA.id + '&select=*') || [];
+      tts.forEach(t => {
+        if (!ROST_TURNOS[t.empleado_id]) ROST_TURNOS[t.empleado_id] = {};
+        ROST_TURNOS[t.empleado_id][t.dia] = t;
+      });
+    }
+    renderRosterLista();
+  } catch (e) {
+    lista.innerHTML = '<div class="loading" style="color:var(--c-error)">Error al cargar la semana</div>';
+    console.error(e);
+  }
+}
+
+function renderRosterLista() {
+  const lista = document.getElementById('rostLista');
+  let emps = ROST_EMPLEADOS;
+  if (ROST_SECTOR_FILTRO) emps = emps.filter(e => e.sector === ROST_SECTOR_FILTRO);
+  if (!emps.length) {
+    lista.innerHTML = '<div class="empty-list">No hay empleados ' + (ROST_SECTOR_FILTRO ? 'de ese sector ' : '') + 'en este local.</div>';
+    return;
+  }
+  const dias = diasDeSemana(ROST_LUNES);
+  const cortos = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+  lista.innerHTML = emps.map(e => {
+    const chips = dias.map((d, i) => {
+      const t = (ROST_TURNOS[e.id] || {})[d];
+      let txt = '—', cls = 'rost-chip';
+      if (t) {
+        if (t.es_off) { txt = 'OFF'; cls += ' off'; }
+        else if (t.es_flex) { txt = t.hora_entrada ? 'F ' + t.hora_entrada.slice(0, 5) : 'FLEX'; cls += ' flex'; }
+        else if (t.hora_entrada) { txt = t.hora_entrada.slice(0, 5); cls += ' on'; }
+        else { txt = 'Trabaja'; cls += ' on'; }
+      }
+      return '<div class="rost-chip-wrap"><span class="rost-dia-lbl">' + cortos[i] + ' ' + Number(d.slice(8, 10)) + '</span><span class="' + cls + '">' + esc(txt) + '</span></div>';
+    }).join('');
+    return '<div class="rost-emp" onclick="abrirEditarTurnosEmp(' + e.id + ')">' +
+      '<div class="rost-emp-top"><span class="rost-emp-nom">' + esc(rostNombreEmp(e)) + '</span><i class="ti ti-chevron-right"></i></div>' +
+      '<div class="rost-chips">' + chips + '</div></div>';
+  }).join('');
+}
+
+window.abrirEditarTurnosEmp = function(empId) {
+  const e = ROST_EMPLEADOS.find(x => x.id === empId);
+  if (!e) return;
+  ROST_EMP_EDIT = empId;
+  document.getElementById('rostEmpNombre').textContent = rostNombreEmp(e);
+  document.getElementById('rostEmpSemana').textContent = (LOCAL_LABELS[ROST_LOCAL] || ROST_LOCAL) + ' · ' + fmtSemana(ROST_LUNES);
+  document.getElementById('rostError').textContent = '';
+
+  const dias = diasDeSemana(ROST_LUNES);
+  const empT = ROST_TURNOS[empId] || {};
+  const estados = [['trabaja', 'Trabaja'], ['off', 'OFF'], ['flex', 'FLEX'], ['', '—']];
+  document.getElementById('rostDias').innerHTML = dias.map((d, i) => {
+    const t = empT[d];
+    let est = '';
+    if (t) { if (t.es_off) est = 'off'; else if (t.es_flex) est = 'flex'; else est = 'trabaja'; }
+    const hora = t && t.hora_entrada ? t.hora_entrada.slice(0, 5) : '';
+    const coment = t && t.comentario ? t.comentario : '';
+    const btns = estados.map(p => '<button type="button" class="rost-est' + (est === p[0] ? ' activo' : '') + '" data-est="' + p[0] + '">' + p[1] + '</button>').join('');
+    const showHora = (est === 'trabaja' || est === 'flex');
+    return '<div class="rost-dia" data-dia="' + d + '" data-est="' + est + '">' +
+      '<div class="rost-dia-head"><strong>' + DIAS_LARGO[i] + '</strong> <span>' + fmtFechaCorta(d) + '</span></div>' +
+      '<div class="rost-estados">' + btns + '</div>' +
+      '<div class="rost-dia-extra">' +
+        '<input type="time" class="rost-hora" value="' + hora + '"' + (showHora ? '' : ' style="display:none;"') + '>' +
+        '<input type="text" class="rost-coment" placeholder="Comentario (opcional)" value="' + esc(coment) + '">' +
+      '</div></div>';
+  }).join('');
+
+  document.querySelectorAll('#rostDias .rost-dia').forEach(block => {
+    block.querySelectorAll('.rost-est').forEach(btn => {
+      btn.addEventListener('click', () => {
+        block.querySelectorAll('.rost-est').forEach(b => b.classList.remove('activo'));
+        btn.classList.add('activo');
+        const est = btn.dataset.est;
+        block.dataset.est = est;
+        block.querySelector('.rost-hora').style.display = (est === 'trabaja' || est === 'flex') ? '' : 'none';
+      });
+    });
+  });
+
+  // Plantillas disponibles para este local (o 'TODOS')
+  const dispo = ROST_PLANTILLAS.filter(p => p.local === ROST_LOCAL || p.local === 'TODOS');
+  const selP = document.getElementById('rostPlantilla');
+  selP.innerHTML = '<option value="">Aplicar una plantilla\u2026</option>' +
+    dispo.map(p => '<option value="' + p.id + '">' + esc(p.nombre) +
+      ' (' + esc(p.local === 'TODOS' ? 'Todos' : (LOCAL_LABELS[p.local] || p.local)) + ')</option>').join('');
+  document.getElementById('rostPlantillaRow').style.display = dispo.length ? 'flex' : 'none';
+
+  document.getElementById('modalEditarTurnos').classList.add('show');
+};
+window.closeEditarTurnosModal = function() {
+  document.getElementById('modalEditarTurnos').classList.remove('show');
+};
+
+window.aplicarPlantilla = function() {
+  const id = parseInt(document.getElementById('rostPlantilla').value, 10);
+  if (!id) return;
+  const tpl = ROST_PLANTILLAS.find(p => p.id === id);
+  if (!tpl) return;
+  const dayKeys = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
+  const blocks = document.querySelectorAll('#rostDias .rost-dia');
+  blocks.forEach((block, i) => {
+    const hora = tpl[dayKeys[i]];
+    const flex = !!tpl[dayKeys[i] + '_flex'];
+    let est = null;
+    if (flex) est = 'flex';
+    else if (hora && String(hora).trim()) est = 'trabaja';
+    if (!est) return; // día vacío en la plantilla → no se toca
+    block.querySelectorAll('.rost-est').forEach(b => b.classList.toggle('activo', b.dataset.est === est));
+    block.dataset.est = est;
+    const horaEl = block.querySelector('.rost-hora');
+    horaEl.style.display = '';
+    horaEl.value = hora ? String(hora).slice(0, 5) : '';
+  });
+  toast('Plantilla aplicada — revisá y guardá', 'success');
+};
+
+async function asegurarSemanaRoster() {
+  if (ROST_SEMANA) return ROST_SEMANA;
+  const ins = await api('roster_semanas', {
+    method: 'POST',
+    body: JSON.stringify({ local: ROST_LOCAL, fecha_lunes: ROST_LUNES, creado_por: currentUser ? currentUser.id : null })
+  });
+  ROST_SEMANA = Array.isArray(ins) ? ins[0] : ins;
+  return ROST_SEMANA;
+}
+
+async function chequearConflictoMultilocal(empId, dias) {
+  try {
+    if (!dias || !dias.length) return;
+    const turnos = await api('roster_turnos?empleado_id=eq.' + empId +
+      '&dia=in.(' + dias.join(',') + ')&es_off=eq.false&select=dia,hora_entrada,semana_id') || [];
+    if (!turnos.length) return;
+    const semIds = Array.from(new Set(turnos.map(t => t.semana_id).filter(Boolean)));
+    if (!semIds.length) return;
+    const sems = await api('roster_semanas?id=in.(' + semIds.join(',') + ')&select=id,local') || [];
+    const locOf = {}; sems.forEach(s => { locOf[s.id] = s.local; });
+    const conf = turnos.filter(t => locOf[t.semana_id] && locOf[t.semana_id] !== ROST_LOCAL);
+    if (!conf.length) return;
+    conf.sort((a, b) => String(a.dia).localeCompare(String(b.dia)));
+    const lineas = conf.map(t => {
+      const loc = LOCAL_LABELS[locOf[t.semana_id]] || locOf[t.semana_id];
+      const h = t.hora_entrada ? (' a las ' + String(t.hora_entrada).slice(0, 5)) : '';
+      return '\u2022 ' + fmtFechaCorta(t.dia) + ': ' + loc + h;
+    }).join('\n');
+    await showAlert({
+      title: '\u26a0\ufe0f Ya tiene turno en otro local',
+      msg: 'Esta persona, adem\u00e1s de ac\u00e1, ya tiene turno asignado en:\n\n' + lineas + '\n\nSi entra en dos locales el mismo d\u00eda en horarios distintos est\u00e1 bien; solo revis\u00e1 que no se superpongan.',
+      type: 'warning'
+    });
+  } catch (e) { console.warn('conflicto multilocal:', e); }
+}
+window.guardarTurnosEmp = async function() {
+  const err = document.getElementById('rostError');
+  err.textContent = '';
+  const empId = ROST_EMP_EDIT;
+  if (!empId) return;
+  const btn = document.getElementById('rostGuardarBtn');
+  btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Guardando...';
+  try {
+    const semana = await asegurarSemanaRoster();
+    const empT = ROST_TURNOS[empId] || {};
+    const blocks = document.querySelectorAll('#rostDias .rost-dia');
+    const aInsertar = [];
+    const diasTrabaja = [];
+    for (const block of blocks) {
+      const dia = block.dataset.dia;
+      const est = block.dataset.est || '';
+      const hora = block.querySelector('.rost-hora').value || null;
+      const coment = block.querySelector('.rost-coment').value.trim() || null;
+      const existente = empT[dia];
+
+      if (!est) {
+        if (existente) {
+          await api('roster_turnos?id=eq.' + existente.id, { method: 'DELETE' });
+          delete empT[dia];
+        }
+        continue;
+      }
+      const payload = {
+        semana_id: semana.id,
+        empleado_id: empId,
+        dia: dia,
+        hora_entrada: (est === 'off') ? null : hora,
+        es_off: est === 'off',
+        es_flex: est === 'flex',
+        comentario: coment
+      };
+      if (est !== 'off') diasTrabaja.push(dia);
+      if (existente) {
+        const upd = await api('roster_turnos?id=eq.' + existente.id, { method: 'PATCH', body: JSON.stringify(payload) });
+        empT[dia] = (Array.isArray(upd) && upd.length) ? upd[0] : Object.assign({}, existente, payload);
+      } else {
+        aInsertar.push(payload);
+      }
+    }
+    if (aInsertar.length) {
+      const inserted = await api('roster_turnos', { method: 'POST', body: JSON.stringify(aInsertar) });
+      (Array.isArray(inserted) ? inserted : [inserted]).forEach(t => { if (t && t.dia) empT[t.dia] = t; });
+    }
+    ROST_TURNOS[empId] = empT;
+    await chequearConflictoMultilocal(empId, diasTrabaja);
+    closeEditarTurnosModal();
+    renderRosterLista();
+    toast('\u2713 Turnos guardados', 'success');
+  } catch (e) {
+    err.textContent = 'No se pudo guardar: ' + (e.message || e);
+  } finally {
+    btn.disabled = false; btn.textContent = txt;
+  }
+};
+
+window.guardarNotaSemana = async function() {
+  try {
+    const nota = document.getElementById('rostNota').value.trim() || null;
+    const semana = await asegurarSemanaRoster();
+    await api('roster_semanas?id=eq.' + semana.id, { method: 'PATCH', body: JSON.stringify({ comentario_general: nota }) });
+    ROST_SEMANA.comentario_general = nota;
+    toast('\u2713 Nota guardada', 'success');
+  } catch (e) {
+    toast('No se pudo guardar la nota: ' + ((e && e.message) || e), 'error');
+  }
+};
+
+
+
+// ============================================
+// ADMIN: PLANTILLAS DE ROSTERS (turnos_estandar)
+// ============================================
+let PLANTILLAS_CACHE = [], PLANTILLA_EDIT_ID = null;
+const PL_DIAS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
+
+async function openPlantillasRosters() {
+  if (!isMaster() && !isAdmin()) { showDashboard(); return; }
+  showView('vPlantillasRosters');
+  await recargarPlantillas();
+}
+async function recargarPlantillas() {
+  const cont = document.getElementById('plantillasLista');
+  cont.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    PLANTILLAS_CACHE = await api('turnos_estandar?select=*&order=local,nombre') || [];
+    renderPlantillasLista();
+  } catch (e) {
+    cont.innerHTML = '<div class="loading" style="color:var(--c-error)">Error al cargar las plantillas</div>';
+    console.error(e);
+  }
+}
+function renderPlantillasLista() {
+  const cont = document.getElementById('plantillasLista');
+  const count = document.getElementById('plantillasCount');
+  const activas = PLANTILLAS_CACHE.filter(p => p.activo).length;
+  count.textContent = activas + ' activa' + (activas !== 1 ? 's' : '') + ' de ' + PLANTILLAS_CACHE.length;
+  if (!PLANTILLAS_CACHE.length) {
+    cont.innerHTML = '<div class="empty-list">Todav\u00eda no hay plantillas. Cre\u00e1 la primera con el bot\u00f3n de arriba.</div>';
+    return;
+  }
+  const cortos = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'S\u00e1', 'Do'];
+  cont.innerHTML = PLANTILLAS_CACHE.map(p => {
+    const chips = PL_DIAS.map((k, i) => {
+      const hora = p[k]; const flex = !!p[k + '_flex'];
+      let txt = '\u2014', cls = 'rost-chip';
+      if (flex) { txt = hora ? 'F ' + String(hora).slice(0, 5) : 'FLEX'; cls += ' flex'; }
+      else if (hora) { txt = String(hora).slice(0, 5); cls += ' on'; }
+      return '<div class="rost-chip-wrap"><span class="rost-dia-lbl">' + cortos[i] + '</span><span class="' + cls + '">' + esc(txt) + '</span></div>';
+    }).join('');
+    const localTxt = p.local === 'TODOS' ? 'Todos' : (LOCAL_LABELS[p.local] || p.local);
+    const inact = p.activo ? '' : ' <span style="color:var(--c-muted);font-weight:400;font-size:11px;">(inactiva)</span>';
+    return '<div class="rost-emp' + (p.activo ? '' : ' inactive') + '" onclick="abrirEditarPlantilla(' + p.id + ')">' +
+      '<div class="rost-emp-top"><span class="rost-emp-nom">' + esc(p.nombre) + inact + '</span>' +
+      '<span style="font-size:11px;color:var(--c-muted);">' + esc(localTxt) + '</span></div>' +
+      '<div class="rost-chips">' + chips + '</div></div>';
+  }).join('');
+}
+
+function llenarLocalSelectPlantilla(sel) {
+  const todos = getLocalesActivos().slice();
+  if (sel && sel !== 'TODOS' && todos.indexOf(sel) === -1) todos.unshift(sel);
+  const opts = ['<option value="TODOS"' + (sel === 'TODOS' || !sel ? ' selected' : '') + '>Todos los locales</option>']
+    .concat(todos.map(l => '<option value="' + esc(l) + '"' + (l === sel ? ' selected' : '') + '>' + esc(LOCAL_LABELS[l] || l) + '</option>'));
+  document.getElementById('plLocal').innerHTML = opts.join('');
+}
+function renderPlantillaDias(p) {
+  const estados = [['trabaja', 'Trabaja'], ['flex', 'FLEX'], ['', '\u2014']];
+  document.getElementById('plDias').innerHTML = PL_DIAS.map((k, i) => {
+    let est = '', hora = '';
+    if (p) {
+      const flex = !!p[k + '_flex']; const h = p[k];
+      if (flex) est = 'flex'; else if (h) est = 'trabaja';
+      hora = h ? String(h).slice(0, 5) : '';
+    }
+    const btns = estados.map(e => '<button type="button" class="rost-est' + (est === e[0] ? ' activo' : '') + '" data-est="' + e[0] + '">' + e[1] + '</button>').join('');
+    const showHora = (est === 'trabaja' || est === 'flex');
+    return '<div class="rost-dia" data-key="' + k + '" data-est="' + est + '">' +
+      '<div class="rost-dia-head"><strong>' + DIAS_LARGO[i] + '</strong></div>' +
+      '<div class="rost-estados">' + btns + '</div>' +
+      '<div class="rost-dia-extra"><input type="time" class="rost-hora" value="' + hora + '"' + (showHora ? '' : ' style="display:none;"') + '></div>' +
+      '</div>';
+  }).join('');
+  document.querySelectorAll('#plDias .rost-dia').forEach(block => {
+    block.querySelectorAll('.rost-est').forEach(btn => {
+      btn.addEventListener('click', () => {
+        block.querySelectorAll('.rost-est').forEach(b => b.classList.remove('activo'));
+        btn.classList.add('activo');
+        const est = btn.dataset.est; block.dataset.est = est;
+        block.querySelector('.rost-hora').style.display = (est === 'trabaja' || est === 'flex') ? '' : 'none';
+      });
+    });
+  });
+}
+
+window.abrirNuevaPlantilla = function() {
+  PLANTILLA_EDIT_ID = null;
+  document.getElementById('plantillaModalTitulo').textContent = 'Nueva plantilla';
+  document.getElementById('plNombre').value = '';
+  document.getElementById('plActivo').checked = true;
+  llenarLocalSelectPlantilla(null);
+  renderPlantillaDias(null);
+  document.getElementById('plError').textContent = '';
+  document.getElementById('modalPlantilla').classList.add('show');
+};
+window.abrirEditarPlantilla = function(id) {
+  const p = PLANTILLAS_CACHE.find(x => x.id === id);
+  if (!p) return;
+  PLANTILLA_EDIT_ID = id;
+  document.getElementById('plantillaModalTitulo').textContent = 'Editar plantilla';
+  document.getElementById('plNombre').value = p.nombre || '';
+  document.getElementById('plActivo').checked = !!p.activo;
+  llenarLocalSelectPlantilla(p.local);
+  renderPlantillaDias(p);
+  document.getElementById('plError').textContent = '';
+  document.getElementById('modalPlantilla').classList.add('show');
+};
+window.closePlantillaModal = function() {
+  document.getElementById('modalPlantilla').classList.remove('show');
+};
+window.guardarPlantilla = async function() {
+  const err = document.getElementById('plError'); err.textContent = '';
+  const nombre = document.getElementById('plNombre').value.trim();
+  if (!nombre) { err.textContent = 'Pon\u00e9 un nombre para la plantilla.'; return; }
+  const payload = {
+    nombre: nombre,
+    local: document.getElementById('plLocal').value,
+    activo: document.getElementById('plActivo').checked
+  };
+  document.querySelectorAll('#plDias .rost-dia').forEach(block => {
+    const k = block.dataset.key; const est = block.dataset.est || '';
+    const hora = block.querySelector('.rost-hora').value || null;
+    payload[k] = (est === '') ? null : hora;
+    payload[k + '_flex'] = (est === 'flex');
+  });
+  const btn = document.getElementById('plGuardarBtn');
+  btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Guardando...';
+  try {
+    if (PLANTILLA_EDIT_ID) {
+      await api('turnos_estandar?id=eq.' + PLANTILLA_EDIT_ID, { method: 'PATCH', body: JSON.stringify(payload) });
+    } else {
+      payload.creado_por = currentUser ? currentUser.id : null;
+      await api('turnos_estandar', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    closePlantillaModal();
+    await recargarPlantillas();
+    toast('\u2713 Plantilla guardada', 'success');
+  } catch (e) {
+    err.textContent = 'No se pudo guardar: ' + (e.message || e);
+  } finally {
+    btn.disabled = false; btn.textContent = txt;
+  }
+};
+
+
+
+// ============================================
+// MIS PEDIDOS (requerimientos + requerimiento_items)
+// ============================================
+function puedeGestionarPedidos() {
+  return isMaster() || isAdmin() || (currentUser && currentUser.editor_pedidos === true);
+}
+function pedLocalesPermitidos() {
+  const tv = getSlugTransversal();
+  const activos = getLocalesActivos().filter(l => l !== tv);
+  if (isMaster() || isAdmin()) return activos;
+  const mios = (currentUser && currentUser.locales_asignados) || [];
+  return activos.filter(l => mios.indexOf(l) !== -1);
+}
+const PED_ESTADOS = {
+  borrador:   { label: 'Borrador',   color: '#B4B2A9' },
+  pendiente:  { label: 'Pendiente',  color: '#EF9F27' },
+  confirmado: { label: 'Confirmado', color: '#378ADD' },
+  completado: { label: 'Completado', color: '#1D9E75' }
+};
+function pedFecha(x) { return x ? fmtFechaCorta(String(x).slice(0, 10)) : ''; }
+
+let PED_LOCAL_FILTRO = '', PED_ESTADO_FILTRO = '';
+let PED_LISTA = [], PED_INSUMOS = [], PED_UNIDADES = [];
+let PED_ACTUAL = null, PED_ITEMS = [];
+
+async function openMisPedidos() {
+  if (!puedeGestionarPedidos()) { showDashboard(); return; }
+  showView('vMisPedidos');
+  const locs = pedLocalesPermitidos();
+  const sel = document.getElementById('pedLocalFiltro');
+  sel.innerHTML = '<option value="">Todos mis locales</option>' +
+    locs.map(l => '<option value="' + esc(l) + '">' + esc(LOCAL_LABELS[l] || l) + '</option>').join('');
+  document.getElementById('pedNuevoBtn').style.display = locs.length ? '' : 'none';
+  await cargarCatalogosPedidos();
+  await cargarPedidos();
+}
+window.openMisPedidos = openMisPedidos;
+async function cargarCatalogosPedidos() {
+  try {
+    if (!PED_INSUMOS.length) PED_INSUMOS = await api('ingredientes?activo=eq.true&select=id,nombre,unidad,costo,cantidad_por_presentacion&order=nombre.asc') || [];
+    if (!PED_UNIDADES.length) PED_UNIDADES = await api('unidades_pedido?activo=eq.true&select=*&order=orden.asc') || [];
+  } catch (e) { console.warn('catalogos pedidos:', e); }
+}
+window.onFiltroPedidos = function() {
+  PED_LOCAL_FILTRO = document.getElementById('pedLocalFiltro').value;
+  PED_ESTADO_FILTRO = document.getElementById('pedEstadoFiltro').value;
+  cargarPedidos();
+};
+async function cargarPedidos() {
+  const lista = document.getElementById('pedidosLista');
+  lista.innerHTML = '<div class="loading">Cargando pedidos...</div>';
+  const locs = pedLocalesPermitidos();
+  try {
+    let q = 'requerimientos?activo=eq.true&select=*&order=fecha_creacion.desc';
+    if (PED_LOCAL_FILTRO) {
+      q += '&local=eq.' + encodeURIComponent(PED_LOCAL_FILTRO);
+    } else if (!isMaster() && !isAdmin()) {
+      if (!locs.length) { lista.innerHTML = '<div class="empty-list">No ten\u00e9s locales asignados.</div>'; return; }
+      q += '&local=in.(' + locs.map(encodeURIComponent).join(',') + ')';
+    }
+    if (PED_ESTADO_FILTRO) q += '&estado=eq.' + PED_ESTADO_FILTRO;
+    PED_LISTA = await api(q) || [];
+    const _ids = PED_LISTA.map(p => p.id);
+    if (_ids.length) {
+      try {
+        const _its = await api('requerimiento_items?requerimiento_id=in.(' + _ids.join(',') + ')&select=requerimiento_id,ingrediente_id,cantidad_pedida,unidad,orden&order=orden.asc') || [];
+        const _by = {};
+        _its.forEach(it => { (_by[it.requerimiento_id] = _by[it.requerimiento_id] || []).push(it); });
+        PED_LISTA.forEach(p => { p._items = _by[p.id] || []; });
+      } catch (e) { PED_LISTA.forEach(p => { p._items = []; }); }
+    }
+    renderPedidos();
+  } catch (e) {
+    lista.innerHTML = '<div class="empty-list" style="color:var(--c-error)">No se pudieron cargar los pedidos.<br><span style="font-size:11px;opacity:.7">' + esc(String((e && e.message) || e)) + '</span></div>';
+  }
+}
+window.exportarPedidosExcel = async function() {
+  try {
+    let q = 'requerimientos?activo=eq.true&estado=eq.confirmado&select=*&order=local.asc,fecha_comprometida.asc';
+    const locs = pedLocalesPermitidos();
+    if (!isMaster() && !isAdmin()) {
+      if (!locs.length) { toast('No tenés locales asignados', 'error'); return; }
+      q += '&local=in.(' + locs.map(encodeURIComponent).join(',') + ')';
+    }
+    const pedidos = await api(q) || [];
+    if (!pedidos.length) { toast('No hay pedidos confirmados para exportar', 'warning'); return; }
+    await cargarCatalogosPedidos();  // asegura PED_INSUMOS para los nombres
+    const ids = pedidos.map(function(p){ return p.id; });
+    let items = [];
+    if (ids.length) {
+      items = await api('requerimiento_items?requerimiento_id=in.(' + ids.join(',') + ')&select=requerimiento_id,ingrediente_id,cantidad_pedida,unidad,stock_actual,comentario_pedido,orden&order=orden.asc') || [];
+    }
+    const porPedido = {};
+    items.forEach(function(it){ (porPedido[it.requerimiento_id] = porPedido[it.requerimiento_id] || []).push(it); });
+    function dstr(x){ return x ? String(x).slice(0, 10) : ''; }
+    function num(x){ return (x != null && x !== '') ? Number(x) : ''; }
+    function fila(p, it){
+      return {
+        'Local': LOCAL_LABELS[p.local] || p.local || '',
+        'Pedido N°': p.id,
+        'Fecha comprometida': dstr(p.fecha_comprometida),
+        'Fecha deseada': dstr(p.fecha_deseada),
+        'Insumo': it ? pedInsumoNombre(it.ingrediente_id) : '',
+        'Cantidad': it ? num(it.cantidad_pedida) : '',
+        'Unidad': it ? (it.unidad || '') : '',
+        'Stock hoy': it ? num(it.stock_actual) : '',
+        'Comentario': it ? (it.comentario_pedido || '') : '',
+        'Fecha pedido': dstr(p.fecha_creacion),
+        'Observaciones': p.observaciones_generales || ''
+      };
+    }
+    const filas = [];
+    pedidos.forEach(function(p){
+      const its = porPedido[p.id] || [];
+      if (!its.length) { filas.push(fila(p, null)); }
+      else { its.forEach(function(it){ filas.push(fila(p, it)); }); }
+    });
+    exportarAExcel('Pedidos_confirmados_AZUCA_' + hoyStr() + '.xlsx', [{ nombre: 'Pedidos confirmados', filas: filas }]);
+    toast('✓ Excel generado (' + pedidos.length + ' pedidos confirmados)', 'success');
+  } catch (e) {
+    toast('No se pudo exportar: ' + ((e && e.message) || e), 'error');
+  }
+};
+
+function renderPedidos() {
+  const lista = document.getElementById('pedidosLista');
+  if (!PED_LISTA.length) { lista.innerHTML = '<div class="empty-list">No hay pedidos con ese criterio.</div>'; return; }
+  lista.innerHTML = PED_LISTA.map(p => {
+    const est = PED_ESTADOS[p.estado] || { label: p.estado || '\u2014', color: '#8A8278' };
+    const partes = [];
+    if (p.fecha_deseada) partes.push('Para ' + pedFecha(p.fecha_deseada));
+    if (p.fecha_comprometida) partes.push('Entrega ' + pedFecha(p.fecha_comprometida));
+    const sub = partes.length ? partes.join(' \u00b7 ') : ('Creado ' + pedFecha(p.fecha_creacion));
+    const its = p._items || [];
+    let itemsHtml = '';
+    if (its.length) {
+      const names = its.slice(0, 5).map(it => esc(pedInsumoNombre(it.ingrediente_id)));
+      const extra = its.length > 5 ? (' +' + (its.length - 5) + ' m\u00e1s') : '';
+      itemsHtml = '<div class="ped-card-items">' + names.join(' \u00b7 ') + extra + '</div>';
+    }
+    return '<div class="ped-card" onclick="abrirPedido(' + p.id + ')">' +
+      '<div class="ped-card-top"><span class="ped-local">' + esc(LOCAL_LABELS[p.local] || p.local) + '</span>' +
+      '<span class="ped-estado" style="background:' + est.color + '22;color:' + est.color + '">' + esc(est.label) + '</span></div>' +
+      '<div class="ped-card-sub">' + esc(sub) + '</div>' + itemsHtml + '</div>';
+  }).join('');
+}
+
+window.abrirNuevoPedido = function() {
+  const locs = pedLocalesPermitidos();
+  if (!locs.length) return;
+  PED_ACTUAL = { id: null, local: locs[0], estado: 'borrador', fecha_deseada: '', fecha_comprometida: '', observaciones_generales: '' };
+  PED_ITEMS = [];
+  showView('vPedidoEditor');
+  renderEditorPedido();
+};
+window.abrirPedido = async function(id) {
+  try {
+    const r = await api('requerimientos?id=eq.' + id + '&select=*');
+    if (!r || !r.length) { toast('No se encontr\u00f3 el pedido', 'error'); return; }
+    PED_ACTUAL = r[0];
+    PED_ITEMS = await api('requerimiento_items?requerimiento_id=eq.' + id + '&select=*&order=orden.asc') || [];
+    showView('vPedidoEditor');
+    renderEditorPedido();
+  } catch (e) { toast('Error al abrir el pedido: ' + ((e && e.message) || e), 'error'); }
+};
+async function recargarPedidoActual() {
+  const r = await api('requerimientos?id=eq.' + PED_ACTUAL.id + '&select=*');
+  if (r && r.length) PED_ACTUAL = r[0];
+  PED_ITEMS = await api('requerimiento_items?requerimiento_id=eq.' + PED_ACTUAL.id + '&select=*&order=orden.asc') || [];
+}
+
+function pedInsumoNombre(id) {
+  const ins = PED_INSUMOS.find(x => x.id === id);
+  return ins ? ins.nombre : ('Insumo #' + id);
+}
+function pedInsumoOptions(sel) {
+  return '<option value="">\u2014 Eleg\u00ed un insumo \u2014</option>' +
+    PED_INSUMOS.map(ins => '<option value="' + ins.id + '"' + (ins.id === sel ? ' selected' : '') + '>' + esc(ins.nombre) + '</option>').join('');
+}
+function pedUnidadOptions(sel) {
+  const us = PED_UNIDADES.map(u => u.nombre);
+  if (sel && us.indexOf(sel) === -1) us.unshift(sel);
+  return '<option value="">\u2014 unidad \u2014</option>' +
+    us.map(u => '<option value="' + esc(u) + '"' + (u === sel ? ' selected' : '') + '>' + esc(u) + '</option>').join('');
+}
+
+// --- Buscador de insumos con texto para cada linea de pedido (Bug: Maira no podia buscar) ---
+function pedInsumoPicker(it, i) {
+  var sel = (it.ingrediente_id != null) ? (PED_INSUMOS.find(function(x){ return x.id === it.ingrediente_id; }) || {}) : {};
+  var nom = sel.nombre || '';
+  return '<div class="ped-ins-wrap">' +
+    '<input type="hidden" class="ped-ins" value="' + (it.ingrediente_id != null ? it.ingrediente_id : '') + '">' +
+    '<input type="text" class="ped-ins-search" placeholder="Buscá un insumo..." value="' + esc(nom) + '" autocomplete="off" ' +
+      'onfocus="pedFiltrarInsumos(this)" oninput="pedFiltrarInsumos(this)" onblur="pedOcultarInsumos(this)">' +
+    '<div class="ped-ins-opts" style="display:none"></div>' +
+  '</div>';
+}
+window.pedFiltrarInsumos = function(input) {
+  var wrap = input.closest('.ped-ins-wrap');
+  if (!wrap) return;
+  var opts = wrap.querySelector('.ped-ins-opts');
+  if (!opts) return;
+  var q = (input.value || '').toLowerCase().trim();
+  var lista = q
+    ? PED_INSUMOS.filter(function(x){ return (x.nombre || '').toLowerCase().indexOf(q) !== -1; })
+    : PED_INSUMOS.slice(0, 40);
+  if (!lista.length) {
+    opts.innerHTML = '<div class="ped-ins-no-result">Sin resultados</div>';
+  } else {
+    opts.innerHTML = lista.map(function(x){
+      return '<div class="ped-ins-opt" data-id="' + x.id + '" data-nombre="' + esc(x.nombre) + '" onclick="pedSelInsumo(this)">' + esc(x.nombre) + '</div>';
+    }).join('');
+  }
+  opts.style.display = 'block';
+};
+window.pedSelInsumo = function(el) {
+  var wrap = el.closest('.ped-ins-wrap');
+  if (!wrap) return;
+  var hid = wrap.querySelector('.ped-ins');
+  var srch = wrap.querySelector('.ped-ins-search');
+  var opts = wrap.querySelector('.ped-ins-opts');
+  if (hid) hid.value = el.dataset.id;
+  if (srch) srch.value = el.dataset.nombre || '';
+  if (opts) opts.style.display = 'none';
+};
+window.pedOcultarInsumos = function(input) {
+  var wrap = input.closest('.ped-ins-wrap');
+  if (!wrap) return;
+  var opts = wrap.querySelector('.ped-ins-opts');
+  setTimeout(function(){ if (opts) opts.style.display = 'none'; }, 400);
+};
+// --- Historial: modulo aun no implementado (activa:false). Stub para evitar ReferenceError. ---
+window.onFiltroHistorial = function() { /* pendiente: implementar carga/filtro de historial */ };
+
+function renderItemPedido(it, i, editable, recepcion, completado) {
+  if (editable) {
+    return '<div class="ped-item" data-idx="' + i + '">' +
+      '<div class="ped-item-head">' + pedInsumoPicker(it, i) +
+      '<button class="ped-item-del" onclick="quitarItemPedido(' + i + ')" aria-label="Quitar"><i class="ti ti-trash"></i></button></div>' +
+      '<div class="ped-item-row">' +
+        '<input class="ped-cant" type="number" step="any" min="0" placeholder="Cantidad" value="' + (it.cantidad_pedida != null ? it.cantidad_pedida : '') + '">' +
+        '<select class="ped-unidad">' + pedUnidadOptions(it.unidad) + '</select></div>' +
+      '<div class="ped-item-row">' +
+        '<input class="ped-stock" type="number" step="any" min="0" placeholder="Stock hoy (opc.)" value="' + (it.stock_actual != null ? it.stock_actual : '') + '">' +
+        '<input class="ped-coment" type="text" placeholder="Comentario (opc.)" value="' + esc(it.comentario_pedido || '') + '"></div>' +
+      '</div>';
+  }
+  if (recepcion || completado) {
+    const recep = [['correcto', 'Recibido correcto'], ['observacion', 'Recibido con observación']];
+    const er = it.estado_recepcion || '';
+    const recibido = it.cantidad_recibida != null ? it.cantidad_recibida : '';
+    const dis = completado ? ' disabled' : '';
+    return '<div class="ped-item" data-idx="' + i + '" data-itemid="' + it.id + '">' +
+      '<div class="ped-item-head"><strong>' + esc(pedInsumoNombre(it.ingrediente_id)) + '</strong></div>' +
+      '<div class="ped-item-sub">Pedido: ' + fmtCant(it.cantidad_pedida || 0) + ' ' + esc(it.unidad || '') + '</div>' +
+      '<div class="ped-item-row">' +
+        '<input class="ped-recibido" type="number" step="any" min="0" placeholder="Recibido" value="' + recibido + '"' + dis + '>' +
+        '<select class="ped-recep-estado"' + dis + '><option value="">\u2014 estado \u2014</option>' +
+          recep.map(r => '<option value="' + r[0] + '"' + (er === r[0] ? ' selected' : '') + '>' + r[1] + '</option>').join('') + '</select></div>' +
+      '<input class="ped-recep-coment" type="text" placeholder="Comentario recepci\u00f3n (opc.)" value="' + esc(it.comentario_recepcion || '') + '"' + dis + '>' +
+      '</div>';
+  }
+  return '<div class="ped-item" data-idx="' + i + '">' +
+    '<div class="ped-item-head"><strong>' + esc(pedInsumoNombre(it.ingrediente_id)) + '</strong></div>' +
+    '<div class="ped-item-sub">' + fmtCant(it.cantidad_pedida || 0) + ' ' + esc(it.unidad || '') + (it.comentario_pedido ? (' \u00b7 ' + esc(it.comentario_pedido)) : '') + '</div></div>';
+}
+
+function renderEditorPedido() {
+  const p = PED_ACTUAL;
+  const est = p.estado || 'borrador';
+  const estInfo = PED_ESTADOS[est] || { label: est, color: '#8A8278' };
+  const soyAdmin = isMaster() || isAdmin();
+  const esNuevo = !p.id;
+  const editable = (est === 'borrador');
+  const recepcion = (est === 'confirmado');
+  const completado = (est === 'completado');
+
+  document.getElementById('pedEditorTitulo').textContent = esNuevo ? 'Nuevo pedido' : ('Pedido \u00b7 ' + (LOCAL_LABELS[p.local] || p.local));
+  document.getElementById('pedEditorSub').innerHTML = '<span class="ped-estado" style="background:' + estInfo.color + '22;color:' + estInfo.color + '">' + esc(estInfo.label) + '</span>';
+
+  let html = '<div class="ped-section">';
+  if (esNuevo) {
+    const locs = pedLocalesPermitidos();
+    html += '<label class="field"><span class="field-label">Local</span><select id="pedLocal">' +
+      locs.map(l => '<option value="' + esc(l) + '"' + (l === p.local ? ' selected' : '') + '>' + esc(LOCAL_LABELS[l] || l) + '</option>').join('') + '</select></label>';
+  }
+  const fd = p.fecha_deseada ? String(p.fecha_deseada).slice(0, 10) : '';
+  if (editable) html += '<label class="field"><span class="field-label">Fecha que lo necesit\u00e1s</span><input type="date" id="pedFechaDeseada" value="' + fd + '"></label>';
+  else if (fd) html += '<div class="ped-info"><span>Fecha deseada</span><strong>' + pedFecha(p.fecha_deseada) + '</strong></div>';
+
+  const fc = p.fecha_comprometida ? String(p.fecha_comprometida).slice(0, 10) : '';
+  if (soyAdmin && est === 'pendiente') html += '<label class="field"><span class="field-label">Fecha comprometida (entrega)</span><input type="date" id="pedFechaComprometida" value="' + fc + '"></label>';
+  else if (fc) html += '<div class="ped-info"><span>Fecha comprometida</span><strong>' + pedFecha(p.fecha_comprometida) + '</strong></div>';
+
+  const obs = p.observaciones_generales || '';
+  if (editable || (soyAdmin && est === 'pendiente')) html += '<label class="field"><span class="field-label">Observaciones</span><textarea id="pedObs" rows="2" placeholder="Opcional">' + esc(obs) + '</textarea></label>';
+  else if (obs) html += '<div class="ped-info"><span>Observaciones</span><strong>' + esc(obs) + '</strong></div>';
+  html += '</div>';
+
+  html += '<div class="ped-section"><div class="ped-section-title">Insumos</div>';
+  if (!PED_ITEMS.length && !editable) html += '<div class="empty-list">Este pedido no tiene insumos.</div>';
+  html += '<div id="pedItems">';
+  PED_ITEMS.forEach((it, i) => { html += renderItemPedido(it, i, editable, recepcion, completado); });
+  html += '</div>';
+  if (editable) html += '<button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="agregarItemPedido()"><i class="ti ti-plus"></i> Agregar insumo</button>';
+  html += '</div>';
+
+  if (recepcion) html += '<div class="ped-recep-hint">“Guardar sin cerrar” guarda lo que recibiste y deja el pedido abierto para seguir cargando más tarde. “Cerrar pedido (recibido)” lo da por recibido y finalizado (ya no se edita).</div>';
+  html += '<div class="ped-actions">';
+  if (editable) {
+    html += '<button class="btn-ghost" onclick="guardarPedido(false)">Guardar borrador</button>';
+    html += '<button class="btn-primary" onclick="guardarPedido(true)">Enviar pedido</button>';
+    if (!esNuevo) html += '<button class="btn-ghost ped-danger" onclick="eliminarPedido()">Eliminar</button>';
+  } else if (est === 'pendiente') {
+    if (soyAdmin) {
+      html += '<button class="btn-ghost" onclick="devolverPedido()">Devolver a borrador</button>';
+      html += '<button class="btn-primary" onclick="confirmarPedido()">Confirmar</button>';
+    } else {
+      html += '<div class="ped-info" style="width:100%"><span>Estado</span><strong>Esperando confirmaci\u00f3n de un Admin</strong></div>';
+    }
+  } else if (recepcion) {
+    html += '<button class="btn-ghost" onclick="guardarRecepcion(false)">Guardar sin cerrar</button>';
+    html += '<button class="btn-primary" onclick="guardarRecepcion(true)">Cerrar pedido (recibido)</button>';
+  }
+  html += '</div>';
+
+  document.getElementById('pedEditorBody').innerHTML = html;
+}
+
+function leerItemsDesdeDOM() {
+  const cont = document.getElementById('pedItems');
+  if (!cont) return;
+  cont.querySelectorAll('.ped-item').forEach(b => {
+    const idx = parseInt(b.dataset.idx, 10);
+    if (isNaN(idx) || !PED_ITEMS[idx]) return;
+    const insEl = b.querySelector('.ped-ins');
+    if (insEl) {
+      PED_ITEMS[idx].ingrediente_id = insEl.value ? parseInt(insEl.value, 10) : null;
+      PED_ITEMS[idx].cantidad_pedida = b.querySelector('.ped-cant').value;
+      PED_ITEMS[idx].unidad = b.querySelector('.ped-unidad').value;
+      PED_ITEMS[idx].stock_actual = b.querySelector('.ped-stock').value;
+      PED_ITEMS[idx].comentario_pedido = b.querySelector('.ped-coment').value;
+    }
+  });
+}
+function leerHeaderDesdeDOM() {
+  const localEl = document.getElementById('pedLocal');
+  if (localEl) PED_ACTUAL.local = localEl.value;
+  const fdEl = document.getElementById('pedFechaDeseada');
+  if (fdEl) PED_ACTUAL.fecha_deseada = fdEl.value || null;
+  const obsEl = document.getElementById('pedObs');
+  if (obsEl) PED_ACTUAL.observaciones_generales = obsEl.value.trim() || null;
+}
+window.agregarItemPedido = function() {
+  leerItemsDesdeDOM();
+  PED_ITEMS.push({ ingrediente_id: null, cantidad_pedida: '', unidad: '', stock_actual: '', comentario_pedido: '' });
+  renderEditorPedido();
+};
+window.quitarItemPedido = function(i) {
+  leerItemsDesdeDOM();
+  PED_ITEMS.splice(i, 1);
+  renderEditorPedido();
+};
+
+window.guardarPedido = async function(enviar) {
+  leerHeaderDesdeDOM();
+  leerItemsDesdeDOM();
+  const validos = PED_ITEMS.filter(it => it.ingrediente_id && parseFloat(it.cantidad_pedida) > 0);
+  if (enviar && !validos.length) { toast('Agreg\u00e1 al menos un insumo con cantidad', 'warning'); return; }
+  try {
+    if (!PED_ACTUAL.id) {
+      const ins = await api('requerimientos', { method: 'POST', body: JSON.stringify({
+        local: PED_ACTUAL.local, estado: 'borrador', fecha_creacion: hoyStr(),
+        fecha_deseada: PED_ACTUAL.fecha_deseada || null,
+        observaciones_generales: PED_ACTUAL.observaciones_generales || null
+      })});
+      PED_ACTUAL = Array.isArray(ins) ? ins[0] : ins;
+    } else {
+      await api('requerimientos?id=eq.' + PED_ACTUAL.id, { method: 'PATCH', body: JSON.stringify({
+        local: PED_ACTUAL.local, fecha_deseada: PED_ACTUAL.fecha_deseada || null,
+        observaciones_generales: PED_ACTUAL.observaciones_generales || null,
+        actualizado_en: new Date().toISOString()
+      })});
+    }
+    await api('requerimiento_items?requerimiento_id=eq.' + PED_ACTUAL.id, { method: 'DELETE' });
+    if (validos.length) {
+      const payload = validos.map((it, i) => ({
+        requerimiento_id: PED_ACTUAL.id, ingrediente_id: it.ingrediente_id,
+        cantidad_pedida: parseFloat(it.cantidad_pedida) || 0, unidad: it.unidad || null,
+        stock_actual: (it.stock_actual !== '' && it.stock_actual != null) ? (parseFloat(it.stock_actual) || 0) : null,
+        comentario_pedido: it.comentario_pedido || null, orden: i
+      }));
+      await api('requerimiento_items', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    if (enviar) {
+      await api('requerimientos?id=eq.' + PED_ACTUAL.id, { method: 'PATCH', body: JSON.stringify({ estado: 'pendiente', actualizado_en: new Date().toISOString() })});
+      toast('\u2713 Pedido enviado', 'success');
+      openMisPedidos();
+    } else {
+      toast('\u2713 Borrador guardado', 'success');
+      await recargarPedidoActual();
+      renderEditorPedido();
+    }
+  } catch (e) { toast('No se pudo guardar: ' + ((e && e.message) || e), 'error'); }
+};
+
+window.confirmarPedido = async function() {
+  const fcEl = document.getElementById('pedFechaComprometida');
+  const obsEl = document.getElementById('pedObs');
+  try {
+    await api('requerimientos?id=eq.' + PED_ACTUAL.id, { method: 'PATCH', body: JSON.stringify({
+      estado: 'confirmado', fecha_comprometida: (fcEl && fcEl.value) ? fcEl.value : null,
+      observaciones_generales: obsEl ? (obsEl.value.trim() || null) : PED_ACTUAL.observaciones_generales,
+      actualizado_en: new Date().toISOString()
+    })});
+    toast('\u2713 Pedido confirmado', 'success');
+    openMisPedidos();
+  } catch (e) { toast('No se pudo confirmar: ' + ((e && e.message) || e), 'error'); }
+};
+window.devolverPedido = async function() {
+  const ok = await showConfirm({ title: 'Devolver a borrador', msg: 'El editor podr\u00e1 modificarlo de nuevo. \u00bfSeguimos?', okLabel: 'Devolver' });
+  if (!ok) return;
+  try {
+    await api('requerimientos?id=eq.' + PED_ACTUAL.id, { method: 'PATCH', body: JSON.stringify({ estado: 'borrador', actualizado_en: new Date().toISOString() })});
+    toast('Pedido devuelto a borrador', 'success');
+    openMisPedidos();
+  } catch (e) { toast('No se pudo devolver: ' + ((e && e.message) || e), 'error'); }
+};
+window.guardarRecepcion = async function(cerrar) {
+  const cont = document.getElementById('pedItems');
+  const blocks = cont.querySelectorAll('.ped-item');
+  try {
+    for (const b of blocks) {
+      const itemId = b.dataset.itemid;
+      if (!itemId) continue;
+      const rec = b.querySelector('.ped-recibido').value;
+      const recibido = (rec !== '') ? (parseFloat(rec) || 0) : null;
+      const estadoEl = b.querySelector('.ped-recep-estado');
+      const estadoVal = estadoEl ? estadoEl.value : '';
+
+      // Al cerrar, todos los items necesitan estado
+      if (cerrar && !estadoVal) {
+        const nombre = b.querySelector('.ped-item-nombre')?.textContent || 'un ítem';
+        toast('Seleccioná el estado de recepción para: ' + nombre, 'error');
+        return;
+      }
+
+      const patch = {
+        cantidad_recibida: recibido,
+        comentario_recepcion: b.querySelector('.ped-recep-coment').value.trim() || null,
+        recibido_en: recibido != null ? new Date().toISOString() : null
+      };
+      // Solo incluir estado_recepcion si fue seleccionado (evita NOT NULL error)
+      if (estadoVal) patch.estado_recepcion = estadoVal;
+
+      await api('requerimiento_items?id=eq.' + itemId, { method: 'PATCH', body: JSON.stringify(patch)});
+    }
+    if (cerrar) {
+      await api('requerimientos?id=eq.' + PED_ACTUAL.id, { method: 'PATCH', body: JSON.stringify({ estado: 'completado', actualizado_en: new Date().toISOString() })});
+      toast('\u2713 Pedido recibido y cerrado', 'success');
+      openMisPedidos();
+    } else {
+      toast('\u2713 Recepci\u00f3n guardada', 'success');
+      await recargarPedidoActual();
+      renderEditorPedido();
+    }
+  } catch (e) { toast('No se pudo guardar la recepci\u00f3n: ' + ((e && e.message) || e), 'error'); }
+};
+window.eliminarAccesoHuerfano = async function(userId) {
+  if (!isMaster() && !isAdmin()) return;
+  const u = (ADMIN_USUARIOS_CACHE || []).find(x => x.id === userId);
+  const nombre = u ? (u.username || 'este usuario') : 'este usuario';
+  const ok = await showConfirm({
+    title: 'Eliminar acceso',
+    msg: 'Vas a eliminar el acceso de @' + nombre + ' a la app. No tiene ficha de empleado asociada. ¿Confirmar?',
+    danger: true, okLabel: 'Eliminar', cancelLabel: 'Cancelar'
+  });
+  if (!ok) return;
+  try {
+    await api('roster_usuarios?id=eq.' + userId, { method: 'DELETE' });
+    ADMIN_USUARIOS_CACHE = (ADMIN_USUARIOS_CACHE || []).filter(u => u.id !== userId);
+    construirPersonas();
+    renderPersonal();
+    toast('Acceso eliminado', 'success');
+  } catch (e) {
+    toast('No se pudo eliminar: ' + ((e && e.message) || e), 'error');
+  }
+};
+
+window.eliminarPedido = async function() {
+  if (!PED_ACTUAL.id) { openMisPedidos(); return; }
+  const ok = await showConfirm({ title: 'Eliminar pedido', msg: 'Se va a eliminar este borrador. \u00bfSeguro?', danger: true, okLabel: 'Eliminar' });
+  if (!ok) return;
+  try {
+    await api('requerimientos?id=eq.' + PED_ACTUAL.id, { method: 'PATCH', body: JSON.stringify({ activo: false })});
+    toast('Pedido eliminado', 'success');
+    openMisPedidos();
+  } catch (e) { toast('No se pudo eliminar', 'error'); }
+};
+
+
+
+// ---- Eliminar persona (Master/Admin): borra ficha + acceso de forma permanente ----
+window.eliminarPersona = async function(empId, userId) {
+  if (!isMaster() && !isAdmin()) return;
+  const p = PERSONAS_CACHE.find(x => x.empleado && x.empleado.id === empId);
+  const nombre = p ? p.nombreCompleto : 'esta persona';
+  const ok = await showConfirm({
+    title: 'Eliminar persona',
+    msg: 'Vas a eliminar a ' + nombre + ' de forma permanente (ficha y acceso a la app). Esto NO se puede deshacer. Si la persona tiene turnos o propinas cargadas, el sistema no va a dejar borrarla: en ese caso us\u00e1 Desactivar.',
+    danger: true, okLabel: 'Eliminar', cancelLabel: 'Cancelar'
+  });
+  if (!ok) return;
+  try {
+    if (userId) await api('roster_usuarios?id=eq.' + userId, { method: 'DELETE' });
+    await api('empleados?id=eq.' + empId, { method: 'DELETE' });
+    ADMIN_EMPLEADOS_CACHE = (ADMIN_EMPLEADOS_CACHE || []).filter(e => e.id !== empId);
+    if (userId) ADMIN_USUARIOS_CACHE = (ADMIN_USUARIOS_CACHE || []).filter(u => u.id !== userId);
+    construirPersonas();
+    renderPersonal();
+    toast('Persona eliminada', 'success');
+  } catch (e) {
+    toast('No se pudo eliminar (puede tener turnos o propinas asociadas). Prob\u00e1 con Desactivar.', 'error');
+    try { openPersonal(); } catch (_) {}
+  }
+};
+
+
+// ============================================
+// MI STOCK (stock_articulos + stock_conteos)
+// ============================================
+function puedeGestionarStock() {
+  return isMaster() || isAdmin() || (currentUser && currentUser.editor_stock === true);
+}
+function stockLocalesPermitidos() {
+  const activos = getLocalesActivos();
+  if (isMaster() || isAdmin()) return activos;
+  const mios = (currentUser && currentUser.locales_asignados) || [];
+  return activos.filter(l => mios.indexOf(l) !== -1);
+}
+let STOCK_TAB = 'cargar', STOCK_LOCAL = '';
+let STOCK_ARTICULOS = [], STOCK_CONTEOS_LOCAL = {}, STOCK_ART_EDIT = null;
+
+async function openMiStock() {
+  if (!puedeGestionarStock()) { showDashboard(); return; }
+  showView('vMiStock');
+  const esAdmin = isMaster() || isAdmin();
+  document.getElementById('stockTabs').style.display = esAdmin ? 'flex' : 'none';
+  STOCK_TAB = 'cargar';
+  document.querySelectorAll('#stockTabs .stock-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'cargar'));
+  const locs = stockLocalesPermitidos();
+  STOCK_LOCAL = locs.length ? locs[0] : '';
+  await cargarStockArticulos();
+  stockRender();
+}
+async function cargarStockArticulos() {
+  try { STOCK_ARTICULOS = await api('stock_articulos?select=*&order=nombre.asc') || []; }
+  catch (e) { STOCK_ARTICULOS = []; console.warn('stock articulos:', e); }
+}
+async function cargarConteosLocal(local) {
+  STOCK_CONTEOS_LOCAL = {};
+  try {
+    const rows = await api('stock_conteos?local=eq.' + encodeURIComponent(local) + '&select=*&order=fecha.desc') || [];
+    rows.forEach(r => {
+      if (!STOCK_CONTEOS_LOCAL[r.articulo_id]) STOCK_CONTEOS_LOCAL[r.articulo_id] = [];
+      STOCK_CONTEOS_LOCAL[r.articulo_id].push(r);
+    });
+  } catch (e) { console.warn('conteos:', e); }
+}
+window.stockCambiarTab = function(tab) {
+  STOCK_TAB = tab;
+  document.querySelectorAll('#stockTabs .stock-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  stockRender();
+};
+window.stockOnChangeLocal = function() {
+  STOCK_LOCAL = document.getElementById('stockLocalSel').value;
+  if (STOCK_TAB === 'reportes' && (isMaster() || isAdmin())) stockRenderReportes();
+  else stockRenderCargar();
+};
+function stockRender() {
+  const tab = (isMaster() || isAdmin()) ? STOCK_TAB : 'cargar';
+  if (tab === 'articulos') stockRenderArticulos();
+  else if (tab === 'reportes') stockRenderReportes();
+  else stockRenderCargar();
+}
+
+// ---- CARGAR (editor y admin) ----
+async function stockRenderCargar() {
+  const body = document.getElementById('stockBody');
+  const locs = stockLocalesPermitidos();
+  if (!locs.length) { body.innerHTML = '<div class="empty-list">No ten\u00e9s locales asignados.</div>'; return; }
+  if (locs.indexOf(STOCK_LOCAL) === -1) STOCK_LOCAL = locs[0];
+  body.innerHTML = '<label class="field"><span class="field-label">Local</span><select id="stockLocalSel" onchange="stockOnChangeLocal()">' +
+    locs.map(l => '<option value="' + esc(l) + '"' + (l === STOCK_LOCAL ? ' selected' : '') + '>' + esc(LOCAL_LABELS[l] || l) + '</option>').join('') +
+    '</select></label><div id="stockCargarLista"><div class="loading">Cargando...</div></div>';
+  await cargarConteosLocal(STOCK_LOCAL);
+  stockRenderCargarLista();
+}
+function stockRenderCargarLista() {
+  const cont = document.getElementById('stockCargarLista');
+  if (!cont) return;
+  const arts = STOCK_ARTICULOS.filter(a => a.activo && (a.locales || []).indexOf(STOCK_LOCAL) !== -1);
+  if (!arts.length) { cont.innerHTML = '<div class="empty-list">No hay art\u00edculos asignados a este local todav\u00eda.</div>'; return; }
+  cont.innerHTML = arts.map(a => {
+    const hist = STOCK_CONTEOS_LOCAL[a.id] || [];
+    const ult = hist.length ? hist[0] : null;
+    const ultTxt = ult ? (fmtCant(ult.cantidad) + (a.unidad ? ' ' + esc(a.unidad) : '') + ' \u00b7 ' + pedFecha(ult.fecha)) : 'Sin registros previos';
+    return '<div class="stock-art" data-art="' + a.id + '" data-ult="' + (ult ? ult.cantidad : '') + '">' +
+      '<div class="stock-art-head"><span class="stock-art-nom">' + esc(a.nombre) + '</span></div>' +
+      '<div class="stock-art-ult">\u00daltimo: ' + ultTxt + '</div>' +
+      '<div class="stock-art-row">' +
+        '<input class="stock-art-input" type="number" step="any" min="0" placeholder="Stock actual' + (a.unidad ? ' (' + esc(a.unidad) + ')' : '') + '" oninput="stockCalcDiff(this)">' +
+        '<span class="stock-art-diff"></span></div>' +
+      '<input class="stock-art-coment" type="text" placeholder="Comentario (opcional)">' +
+      '</div>';
+  }).join('') +
+    '<button class="btn-primary" style="width:100%;margin-top:8px;" onclick="guardarStockConteos()"><i class="ti ti-device-floppy"></i> Guardar stock</button>';
+}
+window.stockCalcDiff = function(input) {
+  const block = input.closest('.stock-art');
+  const diffEl = block.querySelector('.stock-art-diff');
+  const ult = parseFloat(block.dataset.ult);
+  const val = parseFloat(input.value);
+  if (isNaN(val) || isNaN(ult)) { diffEl.textContent = ''; diffEl.className = 'stock-art-diff'; return; }
+  if (ult === 0) { diffEl.textContent = ''; diffEl.className = 'stock-art-diff'; return; }
+  const pct = ((val - ult) / ult) * 100;
+  diffEl.textContent = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+  diffEl.className = 'stock-art-diff ' + (pct < 0 ? 'baja' : (pct > 0 ? 'sube' : ''));
+};
+window.guardarStockConteos = async function() {
+  const blocks = document.querySelectorAll('#stockCargarLista .stock-art');
+  const payload = [];
+  blocks.forEach(b => {
+    const val = b.querySelector('.stock-art-input').value;
+    if (val === '' || isNaN(parseFloat(val))) return;
+    payload.push({
+      articulo_id: parseInt(b.dataset.art, 10),
+      local: STOCK_LOCAL,
+      cantidad: parseFloat(val),
+      comentario: b.querySelector('.stock-art-coment').value.trim() || null,
+      editor_id: currentUser ? currentUser.id : null
+    });
+  });
+  if (!payload.length) { toast('Carg\u00e1 al menos un stock', 'warning'); return; }
+  try {
+    await api('stock_conteos', { method: 'POST', body: JSON.stringify(payload) });
+    toast('\u2713 Stock guardado', 'success');
+    await cargarConteosLocal(STOCK_LOCAL);
+    stockRenderCargarLista();
+  } catch (e) { toast('No se pudo guardar: ' + ((e && e.message) || e), 'error'); }
+};
+
+// ---- ARTÍCULOS (admin) ----
+function stockRenderArticulos() {
+  const body = document.getElementById('stockBody');
+  let html = '<button class="btn-primary" style="width:100%;margin-bottom:14px;" onclick="abrirNuevoStockArticulo()"><i class="ti ti-plus"></i> Nuevo art\u00edculo</button>';
+  if (!STOCK_ARTICULOS.length) { body.innerHTML = html + '<div class="empty-list">Todav\u00eda no hay art\u00edculos. Cre\u00e1 el primero.</div>'; return; }
+  html += STOCK_ARTICULOS.map(a => {
+    const locs = (a.locales || []).map(l => LOCAL_LABELS[l] || l).join(', ') || 'Sin locales asignados';
+    const inact = a.activo ? '' : ' <span style="color:var(--c-muted);font-weight:400;font-size:11px;">(inactivo)</span>';
+    return '<div class="ped-card" onclick="abrirEditarStockArticulo(' + a.id + ')"' + (a.activo ? '' : ' style="opacity:.55;"') + '>' +
+      '<div class="ped-card-top"><span class="ped-local">' + esc(a.nombre) + inact + '</span>' +
+      (a.unidad ? '<span style="font-size:11px;color:var(--c-muted);">' + esc(a.unidad) + '</span>' : '') + '</div>' +
+      '<div class="ped-card-sub">' + esc(locs) + '</div></div>';
+  }).join('');
+  body.innerHTML = html;
+}
+const STOCK_UNIDADES = ['unidad', 'litros', 'kilos'];
+function stockUnidadOptions(sel) {
+  const us = STOCK_UNIDADES.slice();
+  if (sel && us.indexOf(sel) === -1) us.unshift(sel);
+  return us.map(u => '<option value="' + esc(u) + '"' + (u === sel ? ' selected' : '') + '>' + esc(u) + '</option>').join('');
+}
+window.abrirNuevoStockArticulo = function() {
+  STOCK_ART_EDIT = null;
+  document.getElementById('stockArtTitulo').textContent = 'Nuevo art\u00edculo';
+  document.getElementById('saNombre').value = '';
+  document.getElementById('saUnidad').innerHTML = stockUnidadOptions('unidad');
+  document.getElementById('saActivo').checked = true;
+  stockLlenarLocalesGrid([]);
+  document.getElementById('saError').textContent = '';
+  document.getElementById('modalStockArticulo').classList.add('show');
+};
+window.abrirEditarStockArticulo = function(id) {
+  const a = STOCK_ARTICULOS.find(x => x.id === id);
+  if (!a) return;
+  STOCK_ART_EDIT = id;
+  document.getElementById('stockArtTitulo').textContent = 'Editar art\u00edculo';
+  document.getElementById('saNombre').value = a.nombre || '';
+  document.getElementById('saUnidad').innerHTML = stockUnidadOptions(a.unidad || 'unidad');
+  document.getElementById('saActivo').checked = !!a.activo;
+  stockLlenarLocalesGrid(a.locales || []);
+  document.getElementById('saError').textContent = '';
+  document.getElementById('modalStockArticulo').classList.add('show');
+};
+function stockLlenarLocalesGrid(sel) {
+  document.getElementById('saLocalesGrid').innerHTML = getLocalesActivos().map(loc => {
+    const on = sel.indexOf(loc) !== -1;
+    return '<label class="local-check' + (on ? ' activo' : '') + '" data-local="' + esc(loc) + '"><input type="checkbox" ' + (on ? 'checked' : '') + '>' + esc(LOCAL_LABELS[loc] || loc) + '</label>';
+  }).join('');
+  document.querySelectorAll('#saLocalesGrid .local-check').forEach(el => {
+    el.addEventListener('click', (e) => { e.preventDefault(); el.classList.toggle('activo'); el.querySelector('input').checked = el.classList.contains('activo'); });
+  });
+}
+window.closeStockArticulo = function() { document.getElementById('modalStockArticulo').classList.remove('show'); };
+window.guardarStockArticulo = async function() {
+  const err = document.getElementById('saError'); err.textContent = '';
+  const nombre = document.getElementById('saNombre').value.trim();
+  if (!nombre) { err.textContent = 'Pon\u00e9 un nombre.'; return; }
+  const locales = Array.from(document.querySelectorAll('#saLocalesGrid .local-check.activo')).map(el => el.dataset.local);
+  const payload = {
+    nombre: nombre,
+    unidad: document.getElementById('saUnidad').value.trim() || null,
+    locales: locales,
+    activo: document.getElementById('saActivo').checked
+  };
+  const btn = document.getElementById('saGuardarBtn');
+  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Guardando...';
+  try {
+    if (STOCK_ART_EDIT) {
+      await api('stock_articulos?id=eq.' + STOCK_ART_EDIT, { method: 'PATCH', body: JSON.stringify(payload) });
+    } else {
+      payload.creado_por = currentUser ? currentUser.id : null;
+      await api('stock_articulos', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    closeStockArticulo();
+    await cargarStockArticulos();
+    stockRender();
+    toast('\u2713 Art\u00edculo guardado', 'success');
+  } catch (e) { err.textContent = 'No se pudo guardar: ' + ((e && e.message) || e); }
+  finally { btn.disabled = false; btn.textContent = t; }
+};
+
+// ---- REPORTES (admin) ----
+async function stockRenderReportes() {
+  const body = document.getElementById('stockBody');
+  const locs = stockLocalesPermitidos();
+  if (!locs.length) { body.innerHTML = '<div class="empty-list">No hay locales.</div>'; return; }
+  if (locs.indexOf(STOCK_LOCAL) === -1) STOCK_LOCAL = locs[0];
+  body.innerHTML = '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">' +
+    '<label class="field" style="flex:1;"><span class="field-label">Local</span><select id="stockLocalSel" onchange="stockOnChangeLocal()">' +
+    locs.map(l => '<option value="' + esc(l) + '"' + (l === STOCK_LOCAL ? ' selected' : '') + '>' + esc(LOCAL_LABELS[l] || l) + '</option>').join('') +
+    '</select></label>' +
+    '<button class="btn-ghost" onclick="stockDescargarReporte()"><i class="ti ti-download"></i> Excel</button></div>' +
+    '<div id="stockReporteLista"><div class="loading">Cargando...</div></div>';
+  await cargarConteosLocal(STOCK_LOCAL);
+  stockRenderReporteLista();
+}
+function stockRenderReporteLista() {
+  const cont = document.getElementById('stockReporteLista');
+  if (!cont) return;
+  const arts = STOCK_ARTICULOS.filter(a => (a.locales || []).indexOf(STOCK_LOCAL) !== -1);
+  if (!arts.length) { cont.innerHTML = '<div class="empty-list">No hay art\u00edculos asignados a este local.</div>'; return; }
+  cont.innerHTML = arts.map(a => {
+    const hist = STOCK_CONTEOS_LOCAL[a.id] || [];
+    const ult = hist.length ? hist[0] : null;
+    const prev = hist.length > 1 ? hist[1] : null;
+    let diff = '';
+    if (ult && prev && parseFloat(prev.cantidad) !== 0) {
+      const pct = ((ult.cantidad - prev.cantidad) / prev.cantidad) * 100;
+      diff = '<span class="stock-art-diff ' + (pct < 0 ? 'baja' : (pct > 0 ? 'sube' : '')) + '">' + (pct > 0 ? '+' : '') + pct.toFixed(1) + '%</span>';
+    }
+    const inact = a.activo ? '' : ' (inactivo)';
+    return '<div class="stock-rep"><div class="stock-rep-top"><span class="stock-art-nom">' + esc(a.nombre) + esc(inact) + '</span>' + diff + '</div>' +
+      '<div class="stock-rep-sub">' + (ult ? (fmtCant(ult.cantidad) + (a.unidad ? ' ' + esc(a.unidad) : '') + ' \u00b7 ' + pedFecha(ult.fecha)) : 'Sin registros') + '</div></div>';
+  }).join('');
+}
+window.stockDescargarReporte = function() {
+  const arts = STOCK_ARTICULOS.filter(a => (a.locales || []).indexOf(STOCK_LOCAL) !== -1);
+  const filas = arts.map(a => {
+    const hist = STOCK_CONTEOS_LOCAL[a.id] || [];
+    const ult = hist.length ? hist[0] : null;
+    return {
+      'Art\u00edculo': a.nombre,
+      'Unidad': a.unidad || '',
+      '\u00daltimo stock': ult ? ult.cantidad : '',
+      'Fecha': ult ? pedFecha(ult.fecha) : '',
+      'Activo': a.activo ? 'S\u00ed' : 'No'
+    };
+  });
+  exportarAExcel('stock_' + STOCK_LOCAL + '_' + hoyStr(), [{ nombre: 'Stock', filas: filas }]);
+};
+
+
+
+// ============================================
+// MIS CIERRES (cierres_caja)
+// ============================================
+function puedeGestionarCierres() {
+  return isMaster() || isAdmin() || (currentUser && currentUser.editor_cierres === true);
+}
+function puedeEditarCierres() { return isMaster() || isAdmin(); }
+function cierresLocalesPermitidos() {
+  const activos = getLocalesActivos();
+  if (isMaster() || isAdmin()) return activos;
+  const mios = (currentUser && currentUser.locales_asignados) || [];
+  return activos.filter(l => mios.indexOf(l) !== -1);
+}
+const CIERRE_CAJA_TURNOS = [['mediodia', 'Mediod\u00eda'], ['noche', 'Noche'], ['evento', 'Evento'], ['especial', 'Especial']];
+function ccTurnoLabel(t) { const f = CIERRE_CAJA_TURNOS.find(x => x[0] === t); return f ? f[1] : (t || '\u2014'); }
+
+let CC_LOCAL_FILTRO = '', CC_LISTA = [], CC_EDIT = null;
+
+async function openMisCierres() {
+  if (!puedeGestionarCierres()) { showDashboard(); return; }
+  showView('vMisCierres');
+  const locs = cierresLocalesPermitidos();
+  document.getElementById('ccLocalFiltro').innerHTML = '<option value="">Todos mis locales</option>' +
+    locs.map(l => '<option value="' + esc(l) + '">' + esc(LOCAL_LABELS[l] || l) + '</option>').join('');
+  document.getElementById('ccNuevoBtn').style.display = locs.length ? '' : 'none';
+  await cargarCierres();
+}
+window.onFiltroCierres = function() {
+  CC_LOCAL_FILTRO = document.getElementById('ccLocalFiltro').value;
+  cargarCierres();
+};
+async function cargarCierres() {
+  const lista = document.getElementById('cierresLista');
+  lista.innerHTML = '<div class="loading">Cargando...</div>';
+  const locs = cierresLocalesPermitidos();
+  try {
+    let q = 'cierres_caja?select=*&order=fecha.desc,id.desc&limit=300';
+    if (CC_LOCAL_FILTRO) q += '&local=eq.' + encodeURIComponent(CC_LOCAL_FILTRO);
+    else if (!isMaster() && !isAdmin()) {
+      if (!locs.length) { lista.innerHTML = '<div class="empty-list">No ten\u00e9s locales asignados.</div>'; return; }
+      q += '&local=in.(' + locs.map(encodeURIComponent).join(',') + ')';
+    }
+    CC_LISTA = await api(q) || [];
+    renderCierres();
+  } catch (e) {
+    lista.innerHTML = '<div class="empty-list" style="color:var(--c-error)">No se pudieron cargar los cierres.<br><span style="font-size:11px;opacity:.7">' + esc(String((e && e.message) || e)) + '</span></div>';
+  }
+}
+function renderCierres() {
+  const lista = document.getElementById('cierresLista');
+  if (!CC_LISTA.length) { lista.innerHTML = '<div class="empty-list">No hay cierres cargados todav\u00eda.</div>'; return; }
+  const puedeEd = puedeEditarCierres();
+  lista.innerHTML = CC_LISTA.map(c => {
+    const prom = (c.pax && c.pax > 0) ? (c.ventas_total / c.pax) : null;
+    const click = puedeEd ? ' onclick="abrirEditarCierreCaja(' + c.id + ')" style="cursor:pointer"' : '';
+    return '<div class="ped-card"' + click + '>' +
+      '<div class="ped-card-top"><span class="ped-local">' + esc(LOCAL_LABELS[c.local] || c.local) + '</span>' +
+      '<span class="cc-venta">$' + formatNumber(c.ventas_total || 0) + '</span></div>' +
+      '<div class="ped-card-sub">' + pedFecha(c.fecha) + ' \u00b7 ' + esc(ccTurnoLabel(c.turno)) + ' \u00b7 ' + (c.pax || 0) + ' pax' +
+      (prom != null ? (' \u00b7 $' + formatNumber(prom) + '/pax') : '') + '</div></div>';
+  }).join('');
+}
+
+window.abrirNuevoCierreCaja = function() {
+  const locs = cierresLocalesPermitidos();
+  if (!locs.length) return;
+  CC_EDIT = null;
+  document.getElementById('ccModalTitulo').textContent = 'Nuevo cierre';
+  document.getElementById('ccLocal').innerHTML = locs.map(l => '<option value="' + esc(l) + '">' + esc(LOCAL_LABELS[l] || l) + '</option>').join('');
+  document.getElementById('ccLocal').disabled = false;
+  document.getElementById('ccFecha').value = hoyStr();
+  document.getElementById('ccTurno').innerHTML = CIERRE_CAJA_TURNOS.map(t => '<option value="' + t[0] + '"' + (t[0] === 'noche' ? ' selected' : '') + '>' + t[1] + '</option>').join('');
+  document.getElementById('ccVentas').value = '';
+  document.getElementById('ccPax').value = '';
+  document.getElementById('ccObs').value = '';
+  document.getElementById('ccProm').textContent = '';
+  document.getElementById('ccError').textContent = '';
+  document.getElementById('ccBorrarBtn').style.display = 'none';
+  document.getElementById('modalCierreCaja').classList.add('show');
+};
+window.abrirEditarCierreCaja = function(id) {
+  if (!puedeEditarCierres()) return;
+  const c = CC_LISTA.find(x => x.id === id);
+  if (!c) return;
+  CC_EDIT = id;
+  document.getElementById('ccModalTitulo').textContent = 'Editar cierre';
+  document.getElementById('ccLocal').innerHTML = '<option value="' + esc(c.local) + '">' + esc(LOCAL_LABELS[c.local] || c.local) + '</option>';
+  document.getElementById('ccLocal').disabled = true;
+  document.getElementById('ccFecha').value = c.fecha ? String(c.fecha).slice(0, 10) : hoyStr();
+  document.getElementById('ccTurno').innerHTML = CIERRE_CAJA_TURNOS.map(t => '<option value="' + t[0] + '"' + (t[0] === c.turno ? ' selected' : '') + '>' + t[1] + '</option>').join('');
+  setMoneyVal('ccVentas', c.ventas_total);
+  document.getElementById('ccPax').value = c.pax != null ? c.pax : '';
+  document.getElementById('ccObs').value = c.observaciones || '';
+  ccCalcProm();
+  document.getElementById('ccError').textContent = '';
+  document.getElementById('ccBorrarBtn').style.display = (isMaster() || isAdmin()) ? '' : 'none';
+  document.getElementById('modalCierreCaja').classList.add('show');
+};
+window.closeCierreCaja = function() { document.getElementById('modalCierreCaja').classList.remove('show'); };
+window.ccCalcProm = function() {
+  const v = parseMiles(document.getElementById('ccVentas').value);
+  const p = parseInt(document.getElementById('ccPax').value, 10);
+  const el = document.getElementById('ccProm');
+  if (!isNaN(v) && !isNaN(p) && p > 0) el.textContent = 'Promedio por pax: $' + formatNumber(v / p);
+  else el.textContent = '';
+};
+window.guardarCierreCaja = async function() {
+  const err = document.getElementById('ccError'); err.textContent = '';
+  const local = document.getElementById('ccLocal').value;
+  const fecha = document.getElementById('ccFecha').value;
+  const turno = document.getElementById('ccTurno').value;
+  const ventas = parseMiles(document.getElementById('ccVentas').value);
+  const pax = parseInt(document.getElementById('ccPax').value, 10);
+  if (!local) { err.textContent = 'Eleg\u00ed un local.'; return; }
+  if (!fecha) { err.textContent = 'Eleg\u00ed la fecha.'; return; }
+  if (isNaN(ventas) || ventas < 0) { err.textContent = 'Carg\u00e1 las ventas totales.'; return; }
+  if (isNaN(pax) || pax < 0) { err.textContent = 'Carg\u00e1 la cantidad de pax.'; return; }
+  const payload = { local: local, fecha: fecha, turno: turno, ventas_total: ventas, pax: pax, observaciones: document.getElementById('ccObs').value.trim() || null };
+  const btn = document.getElementById('ccGuardarBtn'); btn.disabled = true; const t = btn.textContent; btn.textContent = 'Guardando...';
+  try {
+    if (CC_EDIT) {
+      await api('cierres_caja?id=eq.' + CC_EDIT, { method: 'PATCH', body: JSON.stringify(payload) });
+    } else {
+      const dup = await api('cierres_caja?local=eq.' + encodeURIComponent(local) + '&fecha=eq.' + fecha + '&turno=eq.' + turno + '&select=id') || [];
+      if (dup.length) { err.textContent = 'Ya hay un cierre para ese local, fecha y turno. Si hay que corregirlo, ped\u00edselo a un Admin.'; btn.disabled = false; btn.textContent = t; return; }
+      payload.creado_por = currentUser ? currentUser.id : null;
+      await api('cierres_caja', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    closeCierreCaja();
+    await cargarCierres();
+    toast('\u2713 Cierre guardado', 'success');
+  } catch (e) { err.textContent = 'No se pudo guardar: ' + ((e && e.message) || e); }
+  finally { btn.disabled = false; btn.textContent = t; }
+};
+window.borrarCierreCaja = async function() {
+  if (!CC_EDIT || !(isMaster() || isAdmin())) return;
+  const ok = await showConfirm({ title: 'Eliminar cierre', msg: 'Se va a eliminar este cierre de caja. \u00bfSeguro?', danger: true, okLabel: 'Eliminar' });
+  if (!ok) return;
+  try {
+    await api('cierres_caja?id=eq.' + CC_EDIT, { method: 'DELETE' });
+    closeCierreCaja();
+    await cargarCierres();
+    toast('Cierre eliminado', 'success');
+  } catch (e) { toast('No se pudo eliminar', 'error'); }
+};
+
+
+
+// ============================================
+// GESTIÓN DE INCIDENCIAS (editor_rosters / admin)
+// ============================================
+let GI_ESTADO = 'pendiente', GI_LISTA = [], GI_EDIT = null;
+const GI_ESTADOS = {
+  pendiente: { label: '\u23f3 Pendiente', cls: 'pendiente' },
+  aprobado:  { label: '\u2713 Aceptada', cls: 'aprobado' },
+  rechazado: { label: '\u2717 Rechazada', cls: 'rechazado' }
+};
+function incLocalesPermitidos() {
+  if (isMaster() || isAdmin()) return null; // null = ve todos
+  const mios = (currentUser && currentUser.locales_asignados) || [];
+  return getLocalesActivos().filter(l => mios.indexOf(l) !== -1);
+}
+function incEmpNombre(emp) {
+  if (!emp) return 'Colaborador';
+  const ap = emp.apellido || '';
+  const pn = emp.nombre_p || emp.nombre || '';
+  return ((ap ? ap + ', ' : '') + pn).trim() || 'Colaborador';
+}
+async function openGestionIncidencias() {
+  if (!puedeGestionarRosters()) { showDashboard(); return; }
+  showView('vGestionIncidencias');
+  document.getElementById('giEstadoFiltro').value = GI_ESTADO;
+  await cargarIncidencias();
+}
+window.onFiltroIncidencias = function() {
+  GI_ESTADO = document.getElementById('giEstadoFiltro').value;
+  cargarIncidencias();
+};
+async function cargarIncidencias() {
+  const lista = document.getElementById('incidenciasLista');
+  lista.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    let q = 'incidencias?select=*&order=fecha.desc,id.desc&limit=300';
+    if (GI_ESTADO) q += '&estado=eq.' + GI_ESTADO;
+    let data = await api(q) || [];
+    const _eids = Array.from(new Set(data.map(i => i.empleado_id).filter(Boolean)));
+    let _emap = {};
+    if (_eids.length) {
+      const _emps = await api('empleados?id=in.(' + _eids.join(',') + ')&select=id,nombre,nombre_p,apellido,local') || [];
+      _emps.forEach(e => { _emap[e.id] = e; });
+    }
+    data.forEach(i => { i.empleado = _emap[i.empleado_id] || null; });
+    const permit = incLocalesPermitidos();
+    if (permit) data = data.filter(i => i.empleado && permit.indexOf(i.empleado.local) !== -1);
+    GI_LISTA = data;
+    renderIncidencias();
+  } catch (e) {
+    lista.innerHTML = '<div class="empty-list" style="color:var(--c-error)">No se pudieron cargar las incidencias.<br><span style="font-size:11px;opacity:.7">' + esc(String((e && e.message) || e)) + '</span></div>';
+  }
+}
+function renderIncidencias() {
+  const lista = document.getElementById('incidenciasLista');
+  if (!GI_LISTA.length) { lista.innerHTML = '<div class="empty-list">No hay incidencias con ese criterio.</div>'; return; }
+  lista.innerHTML = GI_LISTA.map(i => {
+    const est = GI_ESTADOS[i.estado] || GI_ESTADOS.pendiente;
+    const tipo = TIPOS_INCIDENCIA[i.tipo] || i.tipo || '';
+    const loc = i.empleado ? (LOCAL_LABELS[i.empleado.local] || i.empleado.local || '') : '';
+    const resp = i.respuesta ? '<div class="inc-resp"><strong>Respuesta:</strong> ' + esc(i.respuesta) + '</div>' : '';
+    const acciones = (i.estado === 'pendiente')
+      ? '<div class="inc-acciones"><button class="btn-ghost inc-ok" onclick="abrirResolverIncidencia(' + i.id + ')"><i class="ti ti-message-reply"></i> Responder</button></div>'
+      : '';
+    return '<div class="ped-card" style="cursor:default">' +
+      '<div class="ped-card-top"><span class="ped-local">' + esc(incEmpNombre(i.empleado)) + '</span>' +
+      '<span class="det-badge ' + est.cls + '">' + est.label + '</span></div>' +
+      '<div class="ped-card-sub">' + esc(tipo) + ' \u00b7 ' + fmtFechaCorta(i.fecha) + (loc ? (' \u00b7 ' + esc(loc)) : '') + '</div>' +
+      '<div class="inc-desc">' + esc(i.descripcion || '') + '</div>' +
+      resp + acciones + '</div>';
+  }).join('');
+}
+window.abrirResolverIncidencia = function(id) {
+  const i = GI_LISTA.find(x => x.id === id);
+  if (!i) return;
+  GI_EDIT = id;
+  document.getElementById('giResTitulo').textContent = TIPOS_INCIDENCIA[i.tipo] || 'Incidencia';
+  document.getElementById('giResInfo').innerHTML =
+    '<div class="ped-card-sub">' + esc(incEmpNombre(i.empleado)) + ' \u00b7 ' + fmtFechaCorta(i.fecha) + '</div>' +
+    '<div class="inc-desc">' + esc(i.descripcion || '') + '</div>';
+  document.getElementById('giResComent').value = i.respuesta || '';
+  document.getElementById('giResError').textContent = '';
+  document.getElementById('modalResolverInc').classList.add('show');
+};
+window.closeResolverInc = function() { document.getElementById('modalResolverInc').classList.remove('show'); };
+async function resolverIncidencia(estado) {
+  if (!GI_EDIT) return;
+  const coment = document.getElementById('giResComent').value.trim() || null;
+  const err = document.getElementById('giResError'); err.textContent = '';
+  const payload = { estado: estado, respuesta: coment, revisado_por: currentUser ? currentUser.id : null, revisado_en: new Date().toISOString() };
+  try {
+    await api('incidencias?id=eq.' + GI_EDIT, { method: 'PATCH', body: JSON.stringify(payload) });
+    closeResolverInc();
+    await cargarIncidencias();
+    toast(estado === 'aprobado' ? '\u2713 Incidencia aceptada' : 'Incidencia rechazada', estado === 'aprobado' ? 'success' : 'warning');
+  } catch (e) { err.textContent = 'No se pudo guardar: ' + ((e && e.message) || e); }
+}
+window.aceptarIncidencia = function() { resolverIncidencia('aprobado'); };
+window.rechazarIncidencia = function() { resolverIncidencia('rechazado'); };
+
+
+
+// ============================================
+// MIS ESTADÍSTICAS (Master / Admin)
+// ============================================
+// ============================================
+// PANEL DE VENTAS (auditores / admin)
+// ============================================
+const IVA_COEF = 1.21;
+let PV_LOCAL = '', PV_MES = '';
+
+function panelLocalesPermitidos() { return pedLocalesPermitidos(); }
+function esLocalAgregado(loc) {
+  if (loc === '__ALL__') return true;
+  return normalizar(loc || '') === 'azuca' || normalizar(localLabel(loc) || '') === 'azuca';
+}
+function panelLocalesReales() {
+  return panelLocalesPermitidos().filter(function(l) { return !esLocalAgregado(l); });
+}
+
+function openPanelVentas() {
+  if (!isMaster() && !isAdmin() && !isAuditor()) { showDashboard(); return; }
+  showView('vPanelVentas');
+  poblarFiltrosPanel();
+  cargarPanelVentas();
+}
+window.openPanelVentas = openPanelVentas;
+
+function poblarFiltrosPanel() {
+  const selMes = document.getElementById('pvMes');
+  const selLocal = document.getElementById('pvLocal');
+  const hoy = new Date();
+  if (!PV_MES) PV_MES = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+  const opsMes = [];
+  for (let i = 0; i < 18; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    opsMes.push('<option value="' + val + '"' + (val === PV_MES ? ' selected' : '') + '>' + MESES_CORTO[d.getMonth()] + ' ' + d.getFullYear() + '</option>');
+  }
+  selMes.innerHTML = opsMes.join('');
+
+  const reales = panelLocalesReales();
+  const puedeTodos = isMaster() || isAdmin();
+  const validos = (puedeTodos ? ['__ALL__'] : []).concat(reales);
+  if (!PV_LOCAL || validos.indexOf(PV_LOCAL) === -1) PV_LOCAL = validos.length ? validos[0] : '';
+  let optsLoc = '';
+  if (puedeTodos) optsLoc += '<option value="__ALL__"' + (PV_LOCAL === '__ALL__' ? ' selected' : '') + '>Todos los locales</option>';
+  optsLoc += reales.map(function(l) {
+    return '<option value="' + esc(l) + '"' + (l === PV_LOCAL ? ' selected' : '') + '>' + esc(localLabel(l)) + '</option>';
+  }).join('');
+  selLocal.innerHTML = optsLoc;
+  const wrap = document.getElementById('pvLocalWrap');
+  if (wrap) wrap.style.display = validos.length > 1 ? '' : 'none';
+}
+
+window.onFiltroPanel = function() {
+  PV_MES = document.getElementById('pvMes').value;
+  PV_LOCAL = document.getElementById('pvLocal').value;
+  cargarPanelVentas();
+};
+
+function _pvRango(mes) {
+  const p = mes.split('-'); const y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  const last = new Date(y, m, 0).getDate();
+  return { desde: mes + '-01', hasta: mes + '-' + String(last).padStart(2, '0') };
+}
+
+async function cargarPanelVentas() {
+  const body = document.getElementById('pvBody');
+  body.innerHTML = '<div class="loading">Cargando...</div>';
+  const loc = PV_LOCAL;
+  if (!loc) { body.innerHTML = '<div class="empty-list">No tenés un local asignado para ver.</div>'; return; }
+  const agregado = esLocalAgregado(loc);
+  const reales = panelLocalesReales();
+  if (agregado && !reales.length) { body.innerHTML = '<div class="empty-list">No hay locales con ventas para consolidar.</div>'; return; }
+  const locFilter = agregado
+    ? 'local=in.(' + reales.map(encodeURIComponent).join(',') + ')'
+    : 'local=eq.' + encodeURIComponent(loc);
+  try {
+    const r = _pvRango(PV_MES);
+    const cierres = await api('cierres_caja?' + locFilter +
+      '&fecha=gte.' + r.desde + '&fecha=lte.' + r.hasta + '&select=*&order=fecha.desc,id.desc') || [];
+    let objetivo = null, objetivoHeredado = false;
+    try {
+      if (agregado) {
+        const allObjs = await api('objetivos_ventas?local=in.(' + reales.map(encodeURIComponent).join(',') + ')&mes=lte.' + PV_MES + '&select=*&order=mes.desc') || [];
+        const seen = {}; let sum = 0, count = 0, anyHer = false;
+        allObjs.forEach(function(o) { if (!seen[o.local]) { seen[o.local] = 1; sum += parseFloat(o.objetivo) || 0; count++; if (o.mes !== PV_MES) anyHer = true; } });
+        if (count) { objetivo = { objetivo: sum, mes: PV_MES }; objetivoHeredado = anyHer; }
+      } else {
+        const objs = await api('objetivos_ventas?local=eq.' + encodeURIComponent(loc) + '&mes=eq.' + PV_MES + '&select=*') || [];
+        if (objs.length) { objetivo = objs[0]; }
+        else {
+          const prev = await api('objetivos_ventas?local=eq.' + encodeURIComponent(loc) + '&mes=lt.' + PV_MES + '&select=*&order=mes.desc&limit=1') || [];
+          if (prev.length) { objetivo = prev[0]; objetivoHeredado = true; }
+        }
+      }
+    } catch (e) { /* la tabla puede no existir todavia */ }
+    const hoy = new Date();
+    const sd = new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1);
+    const evolDesde = sd.getFullYear() + '-' + String(sd.getMonth() + 1).padStart(2, '0') + '-01';
+    const evolData = await api('cierres_caja?' + locFilter +
+      '&fecha=gte.' + evolDesde + '&select=fecha,ventas_total&order=fecha.asc') || [];
+    renderPanelVentas(cierres, objetivo, evolData, objetivoHeredado, agregado);
+  } catch (e) {
+    body.innerHTML = '<div class="empty-list" style="color:var(--c-error)">No se pudieron cargar los datos.<br><span style="font-size:11px;opacity:.7">' + esc(String((e && e.message) || e)) + '</span></div>';
+  }
+}
+
+function _pvMoney(n) { return '$' + formatNumber(n); }
+
+function renderPanelVentas(cierres, objetivo, evolData, objetivoHeredado, agregado) {
+  const body = document.getElementById('pvBody');
+  const brutoVentas = cierres.reduce(function(s, c) { return s + (parseFloat(c.ventas_total) || 0); }, 0);
+  const pax = cierres.reduce(function(s, c) { return s + (parseInt(c.pax, 10) || 0); }, 0);
+  const netoVentas = brutoVentas / IVA_COEF;
+  const promBruto = pax > 0 ? brutoVentas / pax : null;
+  const promNeto = pax > 0 ? netoVentas / pax : null;
+
+  let html = '';
+  if (agregado) html += '<div class="cierre-hint" style="margin-bottom:12px">Vista consolidada: suma de todos los locales.</div>';
+  html += '<div class="est-cards">' +
+    '<div class="est-card"><div class="est-card-label">Ventas (bruto)</div><div class="est-card-valor">' + _pvMoney(brutoVentas) + '</div><div class="pv-sub">Neto ' + _pvMoney(netoVentas) + '</div></div>' +
+    '<div class="est-card"><div class="est-card-label">Comensales</div><div class="est-card-valor">' + formatNumber(pax) + '</div></div>' +
+    '<div class="est-card"><div class="est-card-label">Prom. x comensal</div><div class="est-card-valor">' + (promBruto != null ? _pvMoney(promBruto) : '—') + '</div><div class="pv-sub">' + (promNeto != null ? 'Neto ' + _pvMoney(promNeto) : '') + '</div></div>' +
+    '<div class="est-card"><div class="est-card-label">Turnos cargados</div><div class="est-card-valor">' + cierres.length + '</div></div>' +
+  '</div>';
+
+  html += '<div class="pv-obj">';
+  html += '<div class="pv-obj-head"><span class="est-section-title">Objetivo del mes</span>';
+  if ((isMaster() || isAdmin()) && !agregado) {
+    html += '<button class="btn-ghost pv-obj-edit" onclick="abrirObjetivo()"><i class="ti ti-pencil"></i> ' + ((objetivo && !objetivoHeredado) ? 'Editar' : 'Cargar') + '</button>';
+  }
+  html += '</div>';
+  if (objetivo) {
+    if (agregado) html += '<div class="cierre-hint" style="margin-bottom:10px">Suma de los objetivos de cada local' + (objetivoHeredado ? ' (algunos heredados del mes anterior)' : '') + '.</div>';
+    else if (objetivoHeredado) html += '<div class="cierre-hint" style="margin-bottom:10px">Objetivo heredado de ' + esc(objetivo.mes) + ' — se puede editar para este mes.</div>';
+    const objNeto = parseFloat(objetivo.objetivo) || 0;
+    const objBruto = objNeto * IVA_COEF;
+    const pct = objBruto > 0 ? (brutoVentas / objBruto) * 100 : 0;
+    const pctClamp = Math.max(0, Math.min(100, pct));
+    const cumplido = pct >= 100;
+    html += '<div class="pv-bar-wrap"><div class="pv-bar' + (cumplido ? ' ok' : '') + '" style="width:' + pctClamp.toFixed(1) + '%"></div></div>';
+    html += '<div class="pv-obj-pct">' + pct.toFixed(0) + '% del objetivo</div>';
+    html += '<div class="est-tabla">' +
+      '<div class="est-tabla-head"><span></span><span>Bruto</span><span>Neto</span></div>' +
+      '<div class="est-tabla-fila"><span>Objetivo</span><span>' + _pvMoney(objBruto) + '</span><span>' + _pvMoney(objNeto) + '</span></div>' +
+      '<div class="est-tabla-fila"><span>Vendido</span><span>' + _pvMoney(brutoVentas) + '</span><span>' + _pvMoney(netoVentas) + '</span></div>' +
+      '<div class="est-tabla-fila"><span>' + (cumplido ? 'Excedente' : 'Falta') + '</span><span>' + _pvMoney(Math.abs(objBruto - brutoVentas)) + '</span><span>' + _pvMoney(Math.abs(objNeto - netoVentas)) + '</span></div>' +
+    '</div>';
+  } else {
+    html += '<div class="cierre-hint">Todavía no hay objetivo cargado para este mes.</div>';
+  }
+  html += '</div>';
+
+  const porMes = {};
+  evolData.forEach(function(c) { const k = String(c.fecha).slice(0, 7); porMes[k] = (porMes[k] || 0) + (parseFloat(c.ventas_total) || 0); });
+  const hoy = new Date();
+  const meses = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    meses.push({ k: k, label: MESES_CORTO[d.getMonth()], val: porMes[k] || 0 });
+  }
+  const maxV = Math.max.apply(null, meses.map(function(m) { return m.val; }).concat([1]));
+  html += '<div class="est-section-title">Evolución (últimos 6 meses)</div>';
+  html += '<div class="pv-evol">' + meses.map(function(m) {
+    const h = maxV > 0 ? Math.round((m.val / maxV) * 100) : 0;
+    return '<div class="pv-evol-col">' +
+      '<div class="pv-evol-val">' + (m.val > 0 ? formatNumber(Math.round(m.val / 1000)) + 'k' : '') + '</div>' +
+      '<div class="pv-evol-barwrap"><div class="pv-evol-bar' + (m.k === PV_MES ? ' cur' : '') + '" style="height:' + Math.max(h, 2) + '%"></div></div>' +
+      '<div class="pv-evol-label">' + m.label + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+
+  html += '<div class="est-section-title">Detalle del mes</div>';
+  if (!cierres.length) {
+    html += '<div class="empty-list">No hay cierres cargados en este mes.</div>';
+  } else {
+    html += '<div class="pv-detalle">' + cierres.map(function(c) {
+      const v = parseFloat(c.ventas_total) || 0;
+      const p = parseInt(c.pax, 10) || 0;
+      const pr = p > 0 ? v / p : null;
+      const obs = c.observaciones ? '<div class="pv-det-obs"><i class="ti ti-message-circle"></i> ' + esc(c.observaciones) + '</div>' : '';
+      return '<div class="pv-det-row">' +
+        '<div class="pv-det-top"><span class="pv-det-fecha">' + (agregado ? esc(localLabel(c.local)) + ' · ' : '') + fmtFechaCorta(String(c.fecha).slice(0, 10)) + ' · ' + esc(ccTurnoLabel(c.turno)) + '</span>' +
+        '<span class="pv-det-venta">' + _pvMoney(v) + '</span></div>' +
+        '<div class="pv-det-sub">' + p + ' comensales' + (pr != null ? ' · ' + _pvMoney(pr) + '/comensal · neto ' + _pvMoney(v / IVA_COEF) : '') + '</div>' +
+        obs +
+      '</div>';
+    }).join('') + '</div>';
+  }
+  body.innerHTML = html;
+}
+
+// ---- Objetivo del mes (solo admin) ----
+let OBJ_LOCAL = '', OBJ_MES = '';
+window.abrirObjetivo = function() {
+  if (!isMaster() && !isAdmin()) return;
+  OBJ_LOCAL = PV_LOCAL; OBJ_MES = PV_MES;
+  document.getElementById('objetivoError').textContent = '';
+  document.getElementById('objetivoContexto').textContent = localLabel(PV_LOCAL) + ' · ' + PV_MES;
+  document.getElementById('objetivoInput').value = '';
+  initMoneyInput('objetivoInput');
+  document.getElementById('modalObjetivo').classList.add('show');
+  api('objetivos_ventas?local=eq.' + encodeURIComponent(PV_LOCAL) + '&mes=eq.' + PV_MES + '&select=*').then(function(objs) {
+    if (objs && objs.length) { setMoneyVal('objetivoInput', parseFloat(objs[0].objetivo) || 0); return; }
+    return api('objetivos_ventas?local=eq.' + encodeURIComponent(PV_LOCAL) + '&mes=lt.' + PV_MES + '&select=*&order=mes.desc&limit=1').then(function(prev) {
+      if (prev && prev.length) setMoneyVal('objetivoInput', parseFloat(prev[0].objetivo) || 0);
+    });
+  }).catch(function() {});
+};
+window.cerrarObjetivo = function() { document.getElementById('modalObjetivo').classList.remove('show'); };
+window.guardarObjetivo = async function() {
+  const err = document.getElementById('objetivoError'); err.textContent = '';
+  const val = parseMiles(document.getElementById('objetivoInput').value);
+  if (!val || val <= 0) { err.textContent = 'Ingresá un objetivo válido.'; return; }
+  const btn = document.getElementById('objetivoGuardarBtn');
+  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Guardando...';
+  try {
+    const ex = await api('objetivos_ventas?local=eq.' + encodeURIComponent(OBJ_LOCAL) + '&mes=eq.' + OBJ_MES + '&select=id') || [];
+    if (ex.length) {
+      await api('objetivos_ventas?id=eq.' + ex[0].id, { method: 'PATCH', body: JSON.stringify({ objetivo: val, creado_por: currentUser.id }) });
+    } else {
+      await api('objetivos_ventas', { method: 'POST', body: JSON.stringify({ local: OBJ_LOCAL, mes: OBJ_MES, objetivo: val, creado_por: currentUser.id, creado_en: new Date().toISOString() }) });
+    }
+    toast('✓ Objetivo guardado', 'success');
+    cerrarObjetivo();
+    cargarPanelVentas();
+  } catch (e) {
+    err.textContent = 'No se pudo guardar: ' + ((e && e.message) || e);
+  } finally { btn.disabled = false; btn.textContent = t; }
+};
+
+let EST_MES = '', EST_LOCAL = '';
+
+function openMisEstadisticas() {
+  if (!isMaster() && !isAdmin()) { showDashboard(); return; }
+  showView('vMisEstadisticas');
+  poblarFiltrosEst();
+  cargarEstadisticas();
+}
+window.openMisEstadisticas = openMisEstadisticas;
+
+function poblarFiltrosEst() {
+  const selMes   = document.getElementById('estMes');
+  const selLocal = document.getElementById('estLocal');
+  const hoy = new Date();
+  if (!EST_MES) {
+    EST_MES = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+  }
+  const opsMes = [];
+  for (let i = 0; i < 18; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const label = MESES_CORTO[d.getMonth()] + ' ' + d.getFullYear();
+    opsMes.push('<option value="' + val + '"' + (val === EST_MES ? ' selected' : '') + '>' + label + '</option>');
+  }
+  selMes.innerHTML = opsMes.join('');
+  const locales = getLocalesActivos().filter(function(l) { return !/transversal/i.test(l); });
+  selLocal.innerHTML = '<option value="">Todos los locales</option>' +
+    locales.map(function(l) {
+      return '<option value="' + esc(l) + '"' + (l === EST_LOCAL ? ' selected' : '') + '>' + esc(localLabel(l)) + '</option>';
+    }).join('');
+}
+
+window.onFiltroEst = function() {
+  EST_MES   = document.getElementById('estMes').value;
+  EST_LOCAL = document.getElementById('estLocal').value;
+  cargarEstadisticas();
+};
+
+async function cargarEstadisticas() {
+  const elRes  = document.getElementById('estResumen');
+  const elList = document.getElementById('estLista');
+  elRes.innerHTML  = '<div class="loading">Cargando estadísticas...</div>';
+  elList.innerHTML = '';
+  try {
+    let q = 'cierres_caja?select=*&order=fecha.desc,id.desc';
+    if (EST_MES) {
+      const parts = EST_MES.split('-');
+      const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+      const lastDay = new Date(y, m, 0).getDate();
+      q += '&fecha=gte.' + EST_MES + '-01&fecha=lte.' + EST_MES + '-' + String(lastDay).padStart(2, '0');
+    }
+    if (EST_LOCAL) {
+      q += '&local=eq.' + encodeURIComponent(EST_LOCAL);
+    }
+    const data = await api(q) || [];
+    renderEstadisticas(data);
+  } catch (e) {
+    elRes.innerHTML  = '<div class="empty-list" style="color:var(--c-error)">No se pudieron cargar los datos.<br><span style="font-size:11px;opacity:.7">' + esc(String((e && e.message) || e)) + '</span></div>';
+    elList.innerHTML = '';
+  }
+}
+
+function renderEstadisticas(data) {
+  const elRes  = document.getElementById('estResumen');
+  const elList = document.getElementById('estLista');
+
+  if (!data.length) {
+    elRes.innerHTML  = '<div class="empty-list">No hay cierres para este período.</div>';
+    elList.innerHTML = '';
+    return;
+  }
+
+  const totalVentas = data.reduce(function(s, c) { return s + (parseFloat(c.ventas_total) || 0); }, 0);
+  const totalPax    = data.reduce(function(s, c) { return s + (parseInt(c.pax, 10) || 0); }, 0);
+  const promGlobal  = totalPax > 0 ? totalVentas / totalPax : null;
+
+  elRes.innerHTML =
+    '<div class="est-cards">' +
+      '<div class="est-card"><div class="est-card-label">Ventas totales</div><div class="est-card-valor">$' + formatNumber(totalVentas) + '</div></div>' +
+      '<div class="est-card"><div class="est-card-label">Pax total</div><div class="est-card-valor">' + formatNumber(totalPax) + '</div></div>' +
+      '<div class="est-card"><div class="est-card-label">Prom. por pax</div><div class="est-card-valor">' + (promGlobal != null ? '$' + formatNumber(promGlobal) : '—') + '</div></div>' +
+      '<div class="est-card"><div class="est-card-label">Turnos</div><div class="est-card-valor">' + data.length + '</div></div>' +
+    '</div>';
+
+  let html = '';
+
+  if (!EST_LOCAL) {
+    const porLocal = {};
+    data.forEach(function(c) {
+      if (!porLocal[c.local]) porLocal[c.local] = { ventas: 0, pax: 0 };
+      porLocal[c.local].ventas += parseFloat(c.ventas_total) || 0;
+      porLocal[c.local].pax    += parseInt(c.pax, 10) || 0;
+    });
+    const locs = Object.keys(porLocal).sort(function(a, b) { return porLocal[b].ventas - porLocal[a].ventas; });
+    html += '<div class="est-section-title">Por local</div>' +
+      '<div class="est-tabla">' +
+        '<div class="est-tabla-head"><span>Local</span><span>Ventas</span><span>Pax</span><span>Prom/pax</span></div>' +
+        locs.map(function(loc) {
+          const r = porLocal[loc];
+          const pr = r.pax > 0 ? r.ventas / r.pax : null;
+          return '<div class="est-tabla-fila">' +
+            '<span>' + esc(localLabel(loc)) + '</span>' +
+            '<span>$' + formatNumber(r.ventas) + '</span>' +
+            '<span>' + formatNumber(r.pax) + '</span>' +
+            '<span>' + (pr != null ? '$' + formatNumber(pr) : '—') + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+  }
+
+  html += '<div class="est-section-title">Cierres del período</div>' +
+    data.map(function(c) {
+      const prom = (c.pax && c.pax > 0) ? c.ventas_total / c.pax : null;
+      return '<div class="ped-sub">' +
+          pedFecha(c.fecha) + ' · ' + esc(ccTurnoLabel(c.turno)) + ' · ' + (c.pax || 0) + ' pax' +
+          (prom != null ? ' · $' + formatNumber(prom) + '/pax' : '') +
+          (c.observaciones ? '<br><span style="font-style:italic;opacity:.7">' + esc(c.observaciones) + '</span>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+  elList.innerHTML = html;
+}
+
+// ================================================================
+//  ACADEMIA AZUCA
+// ================================================================
+
+let ACADEMIA_PAPERS          = [];
+let ACADEMIA_INTENTOS_USER   = [];
+let ACADEMIA_PREGUNTAS_CACHE = {}; // { paperId: [...preguntas] }
+let ACADEMIA_QUIZ_ACTIVO     = null; // { paperId, preguntas, respuestas:{} }
+let ACADEMIA_NIVEL_SEL       = 1;
+let ACADEMIA_PAPER_VIENDO    = null;
+let ACADEMIA_EDIT_PAPER_ID   = null;
+let ACADEMIA_EDIT_PREGUNTAS  = [];
+
+const ACADEMIA_NIVELES = {
+  1: { label: 'Nivel 1 · Iniciante',  color: '#5DCAA5', icon: 'ti-seedling' },
+  2: { label: 'Nivel 2 · Avanzado',   color: '#EF9F27', icon: 'ti-flame'    },
+  3: { label: 'Nivel 3 · Formadores', color: '#7F77DD', icon: 'ti-crown'    }
+};
+let ACADEMIA_VIEW = 'lista'; // 'lista' = selector de nivel, 'nivel' = dentro de un nivel
+
+// ── Vista empleado ────────────────────────────────────────────
+
+async function openAcademia() {
+  ACADEMIA_VIEW = 'lista';
+  showView('vBiblioteca');
+  const cont  = document.getElementById('bibContenido');
+  const chips = document.getElementById('bibChips');
+  chips.innerHTML = '';
+  cont.innerHTML  = '<div class="loading">Cargando Academia...</div>';
+
+  try {
+    const [resPapers, resIntentos] = await Promise.allSettled([
+      api('academia_papers?activo=eq.true&order=nivel.asc,unidad.asc'),
+      api('academia_intentos?user_id=eq.' + currentUser.id)
+    ]);
+    if (resPapers.status === 'rejected') {
+      cont.innerHTML = '<div class="loading" style="color:var(--c-error)">Error al cargar Academia</div>';
+      return;
+    }
+    ACADEMIA_PAPERS        = resPapers.value  || [];
+    ACADEMIA_INTENTOS_USER = resIntentos.status === 'fulfilled' ? (resIntentos.value || []) : [];
+  } catch (e) {
+    cont.innerHTML = '<div class="loading" style="color:var(--c-error)">Error al cargar Academia</div>';
+    return;
+  }
+  renderAcademiaView();
+}
+window.openAcademia = openAcademia;
+
+function _acadMejores() {
+  const m = {};
+  ACADEMIA_INTENTOS_USER.forEach(i => {
+    if (!m[i.paper_id] || i.puntaje > m[i.paper_id].puntaje) m[i.paper_id] = i;
+  });
+  return m;
+}
+
+function _nivelCompletado(n, mejores) {
+  const papers = ACADEMIA_PAPERS.filter(p => p.nivel === n);
+  if (!papers.length) return false;
+  return papers.every(p => mejores[p.id] && mejores[p.id].aprobado);
+}
+
+function renderAcademiaView() {
+  if (ACADEMIA_VIEW === 'nivel') renderAcademiaNivel();
+  else renderAcademiaLista();
+}
+
+function renderAcademiaLista() {
+  const chips = document.getElementById('bibChips');
+  const cont  = document.getElementById('bibContenido');
+
+  chips.innerHTML = `<button class="bib-chip" onclick="openMiBiblioteca()">
+    <i class="ti ti-arrow-left"></i> Biblioteca
+  </button>`;
+
+  const mejores = _acadMejores();
+
+  const nivConfig = [
+    { n:1, reqPrev: null },
+    { n:2, reqPrev: 1    },
+    { n:3, reqPrev: 2    }
+  ];
+
+  cont.innerHTML = '<div class="acad-niveles-lista">' +
+    nivConfig.map(({ n, reqPrev }) => {
+      const nc       = ACADEMIA_NIVELES[n] || { label:'Nivel '+n, color:'#888', icon:'ti-book' };
+      const desbloq  = reqPrev === null || _nivelCompletado(reqPrev, mejores);
+      const completado = _nivelCompletado(n, mejores);
+      const papers   = ACADEMIA_PAPERS.filter(p => p.nivel === n);
+      const aprobados = papers.filter(p => mejores[p.id] && mejores[p.id].aprobado).length;
+      const prevLabel = reqPrev ? (ACADEMIA_NIVELES[reqPrev]||{label:'Nivel '+reqPrev}).label : '';
+
+      return `
+        <div class="acad-nivel-card${!desbloq?' acad-nivel-card--locked':completado?' acad-nivel-card--done':''}"
+             ${desbloq ? `onclick="selAcadNivel(${n})"` : ''}>
+          <div class="acad-nivel-icon" style="background:${nc.color}22;color:${!desbloq?'var(--c-muted)':nc.color}">
+            <i class="ti ${!desbloq?'ti-lock':nc.icon}"></i>
+          </div>
+          <div class="acad-nivel-info">
+            <div class="acad-nivel-nombre" style="color:${!desbloq?'var(--c-muted)':'inherit'}">${nc.label}</div>
+            <div class="acad-nivel-estado">
+              ${!desbloq
+                ? `<span class="acad-lock-msg">Completá ${prevLabel} para desbloquear</span>`
+                : papers.length
+                  ? `<span class="acad-progress-txt">${aprobados} de ${papers.length} aprobado${papers.length!==1?'s':''}</span>`
+                  : '<span class="acad-progress-txt">Sin contenido aún</span>'
+              }
+            </div>
+          </div>
+          ${desbloq && completado ? `<div class="acad-nivel-check"><i class="ti ti-circle-check-filled"></i></div>` : ''}
+          ${desbloq && !completado ? `<i class="ti ti-chevron-right acad-nivel-arrow"></i>` : ''}
+        </div>`;
+    }).join('') +
+  '</div>';
+}
+
+function renderAcademiaNivel() {
+  const chips    = document.getElementById('bibChips');
+  const cont     = document.getElementById('bibContenido');
+  const nc       = ACADEMIA_NIVELES[ACADEMIA_NIVEL_SEL] || { label:'Nivel '+ACADEMIA_NIVEL_SEL, color:'#888' };
+
+  chips.innerHTML = `<button class="bib-chip" onclick="volverListaNiveles()">
+    <i class="ti ti-arrow-left"></i> Academia
+  </button>`;
+
+  const papersNivel = ACADEMIA_PAPERS.filter(p => p.nivel === ACADEMIA_NIVEL_SEL);
+
+  if (!papersNivel.length) {
+    cont.innerHTML = '<div class="bib-empty"><i class="ti ti-books"></i><div class="bib-empty-title">Todavía no hay contenido para este nivel.</div></div>';
+    return;
+  }
+
+  const mejores = _acadMejores();
+  const unidades = [...new Set(papersNivel.map(p => p.unidad))].sort((a,b) => a-b);
+
+  cont.innerHTML = `
+    <div class="acad-nivel-header">
+      <span class="acad-nivel-pill" style="background:${nc.color}22;color:${nc.color};border:1px solid ${nc.color}55">
+        <i class="ti ${nc.icon||'ti-book'}"></i> ${nc.label}
+      </span>
+    </div>
+    <div class="acad-unidades">
+      ${unidades.map(u => {
+        const uPapers = papersNivel.filter(p => p.unidad === u);
+        return `
+          <div class="acad-unidad-grupo">
+            <div class="acad-unidad-titulo">Unidad ${u}</div>
+            <div class="acad-items">
+              ${uPapers.map(p => {
+                const it = mejores[p.id];
+                const ok = it && it.aprobado;
+                const hz = !!it;
+                return `
+                  <div class="acad-item acad-item--paper${ok?' acad-item--done':''}" onclick="openPaperReader(${p.id})">
+                    <div class="acad-item-icon acad-item-icon--paper"><i class="ti ti-file-text"></i></div>
+                    <div class="acad-item-body">
+                      <div class="acad-item-tipo">Paper</div>
+                      <div class="acad-item-titulo">${esc(p.titulo)}</div>
+                    </div>
+                    <div class="acad-item-arrow">${ok?'<i class="ti ti-check acad-item-check"></i>':'<i class="ti ti-chevron-right"></i>'}</div>
+                  </div>
+                  <div class="acad-item acad-item--quiz${ok?' acad-item--done':hz?' acad-item--revisar':''}" onclick="openQuizAcademia(${p.id})">
+                    <div class="acad-item-icon acad-item-icon--quiz"><i class="ti ti-list-check"></i></div>
+                    <div class="acad-item-body">
+                      <div class="acad-item-tipo">Quiz</div>
+                      <div class="acad-item-titulo">${esc(p.titulo)}</div>
+                      ${hz?`<div class="acad-item-score${ok?' acad-item-score--ok':' acad-item-score--rev'}">${it.puntaje}/${it.total_preguntas} · ${ok?'Aprobado ✓':'A reforzar'}</div>`:''}
+                    </div>
+                    <div class="acad-item-arrow">${ok?'<i class="ti ti-check acad-item-check"></i>':hz?'<i class="ti ti-refresh"></i>':'<i class="ti ti-chevron-right"></i>'}</div>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+window.selAcadNivel = function(n) {
+  ACADEMIA_NIVEL_SEL = n;
+  ACADEMIA_VIEW = 'nivel';
+  renderAcademiaView();
+};
+window.volverListaNiveles = function() {
+  ACADEMIA_VIEW = 'lista';
+  renderAcademiaView();
+};
+
+function renderPaperMd(txt) {
+  const lines = (txt || '').split('\n');
+  let html = '', inUl = false;
+  const flush = () => { if (inUl) { html += '</ul>'; inUl = false; } };
+  for (const l of lines) {
+    if      (l.startsWith('# '))  { flush(); html += `<h2 class="paper-h2">${esc(l.slice(2))}</h2>`; }
+    else if (l.startsWith('## ')) { flush(); html += `<h3 class="paper-h3">${esc(l.slice(3))}</h3>`; }
+    else if (l.startsWith('> '))  { flush(); html += `<div class="paper-callout">${esc(l.slice(2))}</div>`; }
+    else if (l.startsWith('- '))  { if (!inUl) { html += '<ul class="paper-ul">'; inUl = true; } html += `<li>${esc(l.slice(2))}</li>`; }
+    else if (l.trim() === '')     { flush(); }
+    else                          { flush(); html += `<p class="paper-p">${esc(l)}</p>`; }
+  }
+  flush();
+  return html;
+}
+
+async function openPaperReader(paperId) {
+  const paper = ACADEMIA_PAPERS.find(p => p.id === paperId);
+  if (!paper) return;
+  ACADEMIA_PAPER_VIENDO = paper;
+
+  const it = ACADEMIA_INTENTOS_USER
+    .filter(i => i.paper_id === paperId)
+    .sort((a, b) => b.puntaje - a.puntaje)[0] || null;
+
+  document.getElementById('paperReaderMeta').textContent =
+    (ACADEMIA_NIVELES[paper.nivel]||{label:'N'+paper.nivel}).label + ' · Unidad ' + paper.unidad;
+  document.getElementById('paperReaderTitulo').textContent = paper.titulo;
+
+  const bodyEl = document.getElementById('paperReaderBody');
+  if (paper.url) {
+    bodyEl.innerHTML = `
+      <div class="paper-pdf-wrap">
+        ${paper.subtitulo ? `<p class="paper-pdf-sub">${esc(paper.subtitulo)}</p>` : ''}
+        <a class="paper-pdf-btn" href="${esc(paper.url)}" target="_blank" rel="noopener noreferrer">
+          <i class="ti ti-file-text"></i> Abrir PDF
+        </a>
+        <p class="paper-pdf-hint">Se abre en una nueva pestaña</p>
+      </div>`;
+  } else {
+    bodyEl.innerHTML = renderPaperMd(paper.contenido);
+  }
+
+  const btn = document.getElementById('paperReaderBtnQuiz');
+  btn.innerHTML = it
+    ? `<i class="ti ti-refresh"></i> Repetir quiz · mejor nota: ${it.puntaje}/${it.total_preguntas}`
+    : '<i class="ti ti-pencil-check"></i> Hacer el quiz';
+
+  const modal = document.getElementById('modalPaperReader');
+  modal.classList.add('show');
+  modal.querySelector('.paper-reader-scroll').scrollTop = 0;
+}
+window.openPaperReader = openPaperReader;
+
+window.closePaperReader = function() {
+  document.getElementById('modalPaperReader').classList.remove('show');
+};
+
+window.iniciarQuiz = async function() {
+  if (!ACADEMIA_PAPER_VIENDO) return;
+  closePaperReader();
+  await openQuizAcademia(ACADEMIA_PAPER_VIENDO.id);
+};
+
+async function openQuizAcademia(paperId) {
+  if (!ACADEMIA_PREGUNTAS_CACHE[paperId]) {
+    try {
+      const d = await api('academia_preguntas?paper_id=eq.' + paperId + '&order=orden.asc');
+      ACADEMIA_PREGUNTAS_CACHE[paperId] = d || [];
+    } catch (e) { toast('Error al cargar el quiz: ' + ((e && e.message) || e), 'error'); return; }
+  }
+
+  const pregs = ACADEMIA_PREGUNTAS_CACHE[paperId];
+  if (!pregs.length) { toast('Este paper todavía no tiene quiz cargado', 'error'); return; }
+
+  ACADEMIA_QUIZ_ACTIVO = { paperId, preguntas: pregs, respuestas: {} };
+
+  const paper = ACADEMIA_PAPERS.find(p => p.id === paperId);
+  document.getElementById('quizModalTitulo').textContent = 'Quiz · ' + (paper ? paper.titulo : '');
+  document.getElementById('quizPreguntas').innerHTML = pregs.map((p, i) => `
+    <div class="quiz-preg" id="qpreg_${p.id}">
+      <div class="quiz-preg-num">Pregunta ${i + 1} de ${pregs.length}</div>
+      <div class="quiz-preg-texto">${esc(p.enunciado)}</div>
+      <div class="quiz-opciones">
+        ${['a','b','c','d'].map(op => `
+          <label class="quiz-op" id="qop_${p.id}_${op}">
+            <input type="radio" name="q${p.id}" value="${op}" onchange="selResp(${p.id},'${op}')">
+            <span class="quiz-op-letra">${op.toUpperCase()}</span>
+            <span class="quiz-op-txt">${esc(p['opcion_'+op])}</span>
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
+
+  document.getElementById('quizFormSection').style.display    = '';
+  document.getElementById('quizResultadoSection').style.display = 'none';
+  document.getElementById('btnEnviarQuiz').disabled   = false;
+  document.getElementById('btnEnviarQuiz').textContent = 'Enviar respuestas';
+
+  const modal = document.getElementById('modalQuizAcademia');
+  modal.classList.add('show');
+  modal.querySelector('.quiz-scroll').scrollTop = 0;
+}
+
+window.selResp = function(pregId, op) {
+  if (!ACADEMIA_QUIZ_ACTIVO) return;
+  ACADEMIA_QUIZ_ACTIVO.respuestas[pregId] = op;
+  const preg = document.getElementById('qpreg_' + pregId);
+  if (preg) {
+    preg.querySelectorAll('.quiz-op').forEach(el => el.classList.remove('quiz-op--sel'));
+    const sel = document.getElementById('qop_' + pregId + '_' + op);
+    if (sel) sel.classList.add('quiz-op--sel');
+  }
+};
+
+window.enviarQuiz = async function() {
+  if (!ACADEMIA_QUIZ_ACTIVO) return;
+  const { paperId, preguntas, respuestas } = ACADEMIA_QUIZ_ACTIVO;
+
+  const sinResp = preguntas.filter(p => !respuestas[p.id]);
+  if (sinResp.length) {
+    toast(`Falt${sinResp.length > 1 ? 'an' : 'a'} ${sinResp.length} pregunta${sinResp.length > 1 ? 's' : ''} sin responder`, 'error');
+    const el = document.getElementById('qpreg_' + sinResp[0].id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  let correctas = 0;
+  preguntas.forEach(p => { if (respuestas[p.id] === p.respuesta_correcta) correctas++; });
+  const total    = preguntas.length;
+  const pct      = Math.round(correctas / total * 100);
+  const aprobado = pct >= 75;
+
+  const btn = document.getElementById('btnEnviarQuiz');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  try {
+    const rec = {
+      paper_id: paperId,
+      user_id: currentUser.id,
+      empleado_id: currentUser.empleado_id || null,
+      puntaje: correctas,
+      total_preguntas: total,
+      aprobado,
+      local: currentUser.local || null,
+      completado_en: new Date().toISOString()
+    };
+    await api('academia_intentos', { method: 'POST', body: JSON.stringify(rec) });
+    ACADEMIA_INTENTOS_USER.push({ ...rec, id: Date.now() });
+  } catch (e) {
+    toast('Error al guardar el resultado: ' + ((e && e.message) || e), 'error');
+    btn.disabled = false; btn.textContent = 'Enviar respuestas';
+    return;
+  }
+
+  document.getElementById('quizFormSection').style.display = 'none';
+  const resEl = document.getElementById('quizResultadoSection');
+  resEl.style.display = '';
+  resEl.innerHTML = `
+    <div class="quiz-resultado ${aprobado ? 'quiz-res--ok' : 'quiz-res--revisar'}">
+      <i class="ti ${aprobado ? 'ti-circle-check' : 'ti-refresh'} quiz-res-icon"></i>
+      <div class="quiz-res-score">${correctas}<span>/${total}</span></div>
+      <div class="quiz-res-pct">${pct}%</div>
+      <p class="quiz-res-msg">${aprobado
+        ? 'Buen trabajo. Aprobaste el quiz con éxito.'
+        : 'Te recomendamos releer el paper y volver a intentarlo cuando estés listo.'}</p>
+      <button class="btn-primary" onclick="cerrarQuiz()">
+        <i class="ti ti-arrow-left"></i> Volver a la Academia
+      </button>
+    </div>`;
+};
+
+window.cerrarQuiz = function() {
+  document.getElementById('modalQuizAcademia').classList.remove('show');
+  ACADEMIA_QUIZ_ACTIVO = null;
+  renderAcademiaView();
+};
+
+// ── Admin: lista de papers ────────────────────────────────────
+
+async function openAdminAcademia() {
+  showView('vAdminBiblioteca');
+  try {
+    ACADEMIA_PAPERS = await api('academia_papers?order=nivel.asc,unidad.asc') || [];
+  } catch (e) { toast('Error al cargar papers: ' + ((e && e.message) || e), 'error'); return; }
+  switchBibTab('academia');
+}
+window.openAdminAcademia = openAdminAcademia;
+
+function renderAdminPapersList() {
+  const cont  = document.getElementById('acadPanelPapers');
+  if (!cont) return;
+  const NCOL  = { 1:'#5DCAA5', 2:'#EF9F27', 3:'#7F77DD' };
+  let html = `<button class="btn-primary-full" style="margin-bottom:14px" onclick="openFormPaper(null)">
+    <i class="ti ti-plus"></i> Nuevo paper
+  </button>`;
+
+  if (!ACADEMIA_PAPERS.length) {
+    html += '<div class="bib-empty"><i class="ti ti-books"></i><div class="bib-empty-title">No hay papers cargados todavía</div></div>';
+  } else {
+    html += '<div class="acad-admin-lista">' +
+      ACADEMIA_PAPERS.map(p => `
+        <div class="acad-admin-item">
+          <span class="acad-nivel-dot" style="background:${NCOL[p.nivel]||'#888'}"></span>
+          <div class="acad-admin-item-info">
+            <div class="acad-admin-item-tit">${esc(p.titulo)}</div>
+            <div class="acad-admin-item-meta">Nivel ${p.nivel} · Unidad ${p.unidad}${!p.activo?' · <em style="opacity:.55">Inactivo</em>':''}</div>
+          </div>
+          <div class="acad-admin-item-actions">
+            <button class="bib-btn-edit"   onclick="openFormPaper(${p.id})" title="Editar"><i class="ti ti-edit"></i></button>
+            <button class="bib-btn-delete" onclick="borrarPaper(${p.id})"   title="Eliminar"><i class="ti ti-trash"></i></button>
+          </div>
+        </div>`).join('') + '</div>';
+  }
+  cont.innerHTML = html;
+}
+
+window.switchAcademiaSubTab = function(tab) {
+  ['papers','progreso'].forEach(t => {
+    document.getElementById('acadSubTab_' + t).classList.toggle('active', t === tab);
+    document.getElementById('acadPanel_'  + t).style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'progreso') cargarProgresoAcademia();
+};
+
+async function cargarProgresoAcademia() {
+  const cont = document.getElementById('acadPanel_progreso');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading">Cargando progreso...</div>';
+  try {
+    const [intentos, emps] = await Promise.all([
+      api('academia_intentos?order=completado_en.desc'),
+      api('empleados?activo=eq.true&select=id,nombre,apellido,nombre_p,local&order=apellido.asc')
+    ]);
+    renderProgresoAcademia(intentos || [], emps || []);
+  } catch (e) {
+    cont.innerHTML = '<div class="loading" style="color:var(--c-error)">Error al cargar progreso</div>';
+  }
+}
+
+function renderProgresoAcademia(intentos, emps) {
+  const mejores = {};
+  intentos.forEach(i => {
+    const k = `${i.empleado_id}_${i.paper_id}`;
+    if (!mejores[k] || i.puntaje > mejores[k].puntaje) mejores[k] = i;
+  });
+
+  const papers  = [...ACADEMIA_PAPERS].sort((a,b) => a.nivel-b.nivel || a.unidad-b.unidad);
+  const locales = [...new Set(emps.map(e => e.local).filter(Boolean))].sort();
+  const cont    = document.getElementById('acadPanel_progreso');
+
+  cont.innerHTML = `
+    <div style="margin-bottom:12px">
+      <select id="acadFiltroLocal" class="form-input" style="max-width:220px" onchange="renderTablaProgreso()">
+        <option value="">Todos los locales</option>
+        ${locales.map(l => `<option value="${esc(l)}">${esc(localLabel(l))}</option>`).join('')}
+      </select>
+    </div>
+    <div id="acadTablaProgreso"></div>`;
+
+  window._ACAD_PROG = { mejores, papers, emps };
+  window.renderTablaProgreso();
+}
+
+window.renderTablaProgreso = function() {
+  const { mejores, papers, emps } = window._ACAD_PROG || {};
+  if (!emps) return;
+  const filtro  = (document.getElementById('acadFiltroLocal')||{}).value || '';
+  const empsFil = filtro ? emps.filter(e => e.local === filtro) : emps;
+  const NCOL    = { 1:'#5DCAA5', 2:'#EF9F27', 3:'#7F77DD' };
+
+  if (!papers.length) {
+    document.getElementById('acadTablaProgreso').innerHTML = '<div class="bib-empty">No hay papers cargados</div>';
+    return;
+  }
+  if (!empsFil.length) {
+    const _atp0 = document.getElementById('acadTablaProgreso'); if (_atp0) _atp0.innerHTML = '<div class="bib-empty">Sin empleados para este filtro</div>';
+    return;
+  }
+
+  const _atpEl = document.getElementById('acadTablaProgreso'); if (_atpEl) _atpEl.innerHTML = `
+    <div class="acad-prog-wrap">
+      <table class="acad-prog-tabla">
+        <thead><tr>
+          <th class="acad-prog-th-emp">Empleado</th>
+          ${papers.map(p => `<th title="${esc(p.titulo)}">
+            <div style="color:${NCOL[p.nivel]||'#888'};font-size:9px;font-weight:700">N${p.nivel}</div>
+            <div style="font-size:10px">U${p.unidad}</div>
+          </th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${empsFil.map(e => {
+            const nom = [e.apellido, e.nombre_p||e.nombre].filter(Boolean).join(', ') || 'Emp#'+e.id;
+            return `<tr>
+              <td class="acad-prog-td-nom">${esc(nom)}</td>
+              ${papers.map(p => {
+                const it = mejores[`${e.id}_${p.id}`];
+                if (!it) return '<td class="acad-prog-td-vacio">—</td>';
+                return `<td class="${it.aprobado?'acad-prog-td-ok':'acad-prog-td-rev'}">${it.puntaje}/${it.total_preguntas}</td>`;
+              }).join('')}
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+};
+
+// ── Form: crear / editar paper ────────────────────────────────
+
+async function openFormPaper(paperId) {
+  ACADEMIA_EDIT_PAPER_ID  = paperId || null;
+  ACADEMIA_EDIT_PREGUNTAS = [];
+
+  document.getElementById('formPaperModalTitulo').textContent = paperId ? 'Editar paper' : 'Nuevo paper';
+
+  if (paperId) {
+    const p = ACADEMIA_PAPERS.find(x => x.id === paperId);
+    if (!p) return;
+    document.getElementById('papTitulo').value    = p.titulo;
+    document.getElementById('papNivel').value     = p.nivel;
+    document.getElementById('papUnidad').value    = p.unidad;
+    document.getElementById('papSubtitulo').value = p.subtitulo || '';
+    document.getElementById('papUrl').value       = p.url || '';
+    document.getElementById('papActivo').checked  = p.activo !== false;
+
+    try {
+      let pregs = ACADEMIA_PREGUNTAS_CACHE[paperId];
+      if (!pregs) {
+        pregs = await api('academia_preguntas?paper_id=eq.'+paperId+'&order=orden.asc') || [];
+        ACADEMIA_PREGUNTAS_CACHE[paperId] = pregs;
+      }
+      ACADEMIA_EDIT_PREGUNTAS = pregs.map(q => ({ ...q }));
+    } catch (e) {}
+  } else {
+    ['papTitulo','papSubtitulo','papUrl'].forEach(id => (document.getElementById(id).value = ''));
+    document.getElementById('papNivel').value   = '1';
+    document.getElementById('papUnidad').value  = '1';
+    document.getElementById('papActivo').checked = true;
+  }
+
+  renderPregEditor();
+  document.getElementById('modalFormPaper').classList.add('show');
+  document.getElementById('modalFormPaper').querySelector('.modal-scrollable').scrollTop = 0;
+}
+window.openFormPaper = openFormPaper;
+
+window.closeFormPaper = function() {
+  document.getElementById('modalFormPaper').classList.remove('show');
+};
+
+function renderPregEditor() {
+  const cont = document.getElementById('pregEditor');
+  if (!cont) return;
+  if (!ACADEMIA_EDIT_PREGUNTAS.length) {
+    cont.innerHTML = '<div style="padding:10px 0;font-size:13px;color:var(--c-muted)">Todavía sin preguntas. Agregá la primera.</div>';
+    return;
+  }
+  cont.innerHTML = ACADEMIA_EDIT_PREGUNTAS.map((q, i) => `
+    <div class="preg-ed-item">
+      <div class="preg-ed-hdr">
+        <span class="preg-ed-num">Pregunta ${i+1}</span>
+        <button class="bib-btn-delete" onclick="delPreg(${i})"><i class="ti ti-trash"></i></button>
+      </div>
+      <textarea class="form-input preg-ed-enunciado" placeholder="Enunciado de la pregunta…"
+        oninput="updPreg(${i},'enunciado',this.value)">${esc(q.enunciado||'')}</textarea>
+      ${['a','b','c','d'].map(op => `
+        <div class="preg-ed-op-row">
+          <input type="radio" name="ok_${i}" value="${op}" ${q.respuesta_correcta===op?'checked':''}
+            onchange="updPreg(${i},'respuesta_correcta','${op}')">
+          <span class="preg-ed-letra">${op.toUpperCase()}.</span>
+          <input type="text" class="form-input" value="${esc(q['opcion_'+op]||'')}"
+            placeholder="Opción ${op.toUpperCase()}"
+            oninput="updPreg(${i},'opcion_${op}',this.value)">
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+window.addPreg = function() {
+  ACADEMIA_EDIT_PREGUNTAS.push({
+    orden: ACADEMIA_EDIT_PREGUNTAS.length + 1,
+    enunciado: '', opcion_a: '', opcion_b: '', opcion_c: '', opcion_d: '',
+    respuesta_correcta: 'a'
+  });
+  renderPregEditor();
+  setTimeout(() => {
+    const sc = document.getElementById('modalFormPaper').querySelector('.modal-scrollable');
+    if (sc) sc.scrollTop = sc.scrollHeight;
+  }, 50);
+};
+
+window.delPreg = function(i) {
+  ACADEMIA_EDIT_PREGUNTAS.splice(i, 1);
+  ACADEMIA_EDIT_PREGUNTAS.forEach((q, idx) => (q.orden = idx + 1));
+  renderPregEditor();
+};
+
+window.updPreg = function(i, field, val) {
+  if (ACADEMIA_EDIT_PREGUNTAS[i]) ACADEMIA_EDIT_PREGUNTAS[i][field] = val;
+};
+
+window.guardarPaper = async function() {
+  const titulo    = document.getElementById('papTitulo').value.trim();
+  const nivel     = parseInt(document.getElementById('papNivel').value);
+  const unidad    = parseInt(document.getElementById('papUnidad').value);
+  const subtitulo = document.getElementById('papSubtitulo').value.trim();
+  const url       = document.getElementById('papUrl').value.trim();
+  const activo    = document.getElementById('papActivo').checked;
+
+  if (!titulo) { toast('Falta el título', 'error'); return; }
+  if (!url)    { toast('Falta el link al PDF', 'error'); return; }
+
+  for (let i = 0; i < ACADEMIA_EDIT_PREGUNTAS.length; i++) {
+    const q = ACADEMIA_EDIT_PREGUNTAS[i];
+    if (!q.enunciado.trim())
+      { toast(`Pregunta ${i+1}: falta el enunciado`, 'error'); return; }
+    if (!q.opcion_a.trim()||!q.opcion_b.trim()||!q.opcion_c.trim()||!q.opcion_d.trim())
+      { toast(`Pregunta ${i+1}: completá todas las opciones`, 'error'); return; }
+  }
+
+  const btn = document.getElementById('btnGuardarPaper');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  try {
+    const body = { titulo, nivel, unidad, url, activo, subtitulo: subtitulo || null };
+    let paperId = ACADEMIA_EDIT_PAPER_ID;
+
+    if (paperId) {
+      await api('academia_papers?id=eq.' + paperId, { method:'PATCH', body: JSON.stringify(body) });
+    } else {
+      body.creado_por = currentUser.id;
+      const res  = await api('academia_papers', { method:'POST', body: JSON.stringify(body) });
+      const nuevo = Array.isArray(res) ? res[0] : res;
+      paperId = nuevo.id;
+    }
+
+    await api('academia_preguntas?paper_id=eq.' + paperId, { method:'DELETE' });
+    if (ACADEMIA_EDIT_PREGUNTAS.length) {
+      await api('academia_preguntas', {
+        method: 'POST',
+        body: JSON.stringify(ACADEMIA_EDIT_PREGUNTAS.map((q, i) => ({
+          paper_id: paperId, orden: i+1,
+          enunciado: q.enunciado,
+          opcion_a: q.opcion_a, opcion_b: q.opcion_b, opcion_c: q.opcion_c, opcion_d: q.opcion_d,
+          respuesta_correcta: q.respuesta_correcta
+        })))
+      });
+    }
+    ACADEMIA_PREGUNTAS_CACHE[paperId] = null;
+
+    toast(ACADEMIA_EDIT_PAPER_ID ? 'Paper actualizado' : 'Paper creado');
+    closeFormPaper();
+    ACADEMIA_PAPERS = await api('academia_papers?order=nivel.asc,unidad.asc') || [];
+    renderAdminPapersList();
+  } catch (e) {
+    toast('Error al guardar el paper: ' + ((e && e.message) || e), 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar paper';
+  }
+};
+
+window.borrarPaper = async function(paperId) {
+  const p = ACADEMIA_PAPERS.find(x => x.id === paperId);
+  if (!p) return;
+  const ok = await showConfirm({
+    title: '¿Eliminar paper?',
+    msg: `Vas a eliminar "${p.titulo}" y todas sus preguntas. No se puede deshacer.`,
+    type: 'danger', danger: true, okLabel: 'Eliminar', cancelLabel: 'Cancelar'
+  });
+  if (!ok) return;
+  try {
+    await api('academia_preguntas?paper_id=eq.' + paperId, { method:'DELETE' });
+    await api('academia_papers?id=eq.' + paperId, { method:'DELETE' });
+    toast('Paper eliminado');
+    ACADEMIA_PAPERS = await api('academia_papers?order=nivel.asc,unidad.asc') || [];
+    renderAdminPapersList();
+  } catch (e) { toast('Error al eliminar: ' + ((e && e.message) || e), 'error'); }
+};
+
+// ── fin ACADEMIA ──────────────────────────────────────────────
 
 init();
 
